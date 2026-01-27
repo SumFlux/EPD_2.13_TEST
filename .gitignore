@@ -1,0 +1,14 @@
+.upload_flags
+.pio
+.vscode
+.idea
+*.log
+*.elf
+*.bin
+build/
+dist/
+__pycache__/
+*.o
+*.a
+.DS_Store
+Thumbs.db
