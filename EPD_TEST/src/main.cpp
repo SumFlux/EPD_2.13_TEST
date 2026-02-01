@@ -4,18 +4,19 @@
 #include <SPI.h>
 
 /*
- * IL3897 (B72) 长寿命高画质版
- * ============================
- * 优化策略：
- * 1. [平滑波形] 更长的脉冲时间，更少的脉冲次数
- * 2. [VCOM协同] 添加VCOM驱动，提升对比度稳定性
- * 3. [刷新节流] 最小刷新间隔保护
- * 4. [智能恢复] 更智能的对比度恢复策略
+ * IL3897 (B72) 编码器控制版
+ * ==========================
+ * 功能：
+ * - 编码器顺时针旋转：数字 +1
+ * - 编码器逆时针旋转：数字 -1
+ * - 编码器按下：强制全刷
+ * - 保持局刷策略：每N次闪白，每M次深度恢复
  */
 
 // ==========================================
 // 硬件引脚配置
 // ==========================================
+// 墨水屏
 #define PIN_MOSI 5
 #define PIN_SCK 6
 #define PIN_CS 7
@@ -23,15 +24,20 @@
 #define PIN_RST 18
 #define PIN_BUSY 8
 
+// 编码器
+#define PIN_ENC_A 40   // 编码器 A 相
+#define PIN_ENC_B 39   // 编码器 B 相
+#define PIN_ENC_BTN 38 // 编码器按键
+
 // ==========================================
 // 性能参数配置
 // ==========================================
 #define SPI_FREQUENCY 10000000
 #define BUSY_MARGIN_MS 10
-#define CONTRAST_RECOVERY_N 20      // 每20次深度恢复（比之前更频繁）
-#define FLASH_WHITE_N 3             // 每3次轻度恢复（更频繁）
-#define MIN_REFRESH_INTERVAL_MS 100 // 最小刷新间隔，保护屏幕
-#define DEMO_LOOP_COUNT 50
+#define CONTRAST_RECOVERY_N 20     // 每20次深度恢复
+#define FLASH_WHITE_N 3            // 每3次轻度恢复
+#define MIN_REFRESH_INTERVAL_MS 50 // 最小刷新间隔
+#define DEBOUNCE_MS 5              // 编码器防抖
 
 // ==========================================
 // 刷新区域定义
@@ -40,7 +46,7 @@ struct RefreshZone {
   int16_t x, y, w, h;
 };
 
-const RefreshZone ZONE_COUNTER = {80, 40, 60, 50};
+const RefreshZone ZONE_COUNTER = {60, 30, 130, 70}; // 更大的显示区域
 
 // ==========================================
 // 驱动实例
@@ -49,193 +55,32 @@ GxEPD2_BW<GxEPD2_213_B72, GxEPD2_213_B72::HEIGHT>
     display(GxEPD2_213_B72(PIN_CS, PIN_DC, PIN_RST, PIN_BUSY));
 
 // ==========================================
-// ★ 长寿命高画质 LUT ★
+// 极致画质 LUT
 // ==========================================
-/*
- * 设计理念：
- * - 使用更长的脉冲时间（0x28=40周期）让粒子充分移动
- * - 只用2个脉冲相位，减少电极应力
- * - 添加VCOM驱动，协同增强对比度
- * - 重复次数适中(1次)，平衡效果和寿命
- */
-const uint8_t LUT_LONGEVITY_HQ[] PROGMEM = {
-    // LUT0: BB 黑→黑 (轻微加强保持)
-    0x00,
-    0x40,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT1: BW 黑→白 (双相位平滑变白)
-    0x80,
-    0x80,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT2: WB 白→黑 ★ 双相位平滑变黑 ★
-    0x40,
-    0x40,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT3: WW 白→白 (轻微加强保持)
-    0x00,
-    0x80,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT4: VCOM ★ 协同驱动 ★
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // 时序参数: [TP_A, TP_B, TP_C, TP_D, RP]
-    // 关键: 使用更长的脉冲时间(0x28=40周期)，而非更多脉冲
-    0x28,
-    0x28,
-    0x00,
-    0x00,
-    0x01, // TP0: 40周期×2相位, 重复1次
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00, // TP1
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00, // TP2
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00, // TP3
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00, // TP4
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00, // TP5
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00, // TP6
-};
-
-// ★★ 极致画质 LUT（最慢但效果最好）★★
 const uint8_t LUT_BEST_QUALITY[] PROGMEM = {
-    // LUT0: BB 黑→黑 (加强保持)
-    0x00,
-    0x40,
-    0x40,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT1: BW 黑→白 (三相位渐进变白)
-    0x80,
-    0x80,
-    0x80,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT2: WB 白→黑 ★ 三相位渐进变黑 ★
-    0x40,
-    0x40,
-    0x40,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT3: WW 白→白 (加强保持)
-    0x00,
-    0x80,
-    0x80,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // LUT4: VCOM (跟随变化)
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-
-    // 时序: 更长脉冲(0x30=48周期)，重复2次
-    0x30,
-    0x30,
-    0x30,
-    0x00,
-    0x02, // TP0: 48周期×3相位, 重复2次
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
+    0x00, 0x40, 0x40, 0x00, 0x00, 0x00, 0x00, // LUT0: BB
+    0x80, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00, // LUT1: BW
+    0x40, 0x40, 0x40, 0x00, 0x00, 0x00, 0x00, // LUT2: WB
+    0x00, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00, // LUT3: WW
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // LUT4: VCOM
+    0x30, 0x30, 0x30, 0x00, 0x02,             // TP0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
 // ==========================================
 // 全局状态
 // ==========================================
-static uint16_t g_partialCount = 0;
+static int16_t g_displayValue = 0;  // 当前显示数字
+static uint16_t g_partialCount = 0; // 局刷计数器
 static unsigned long g_lastRefreshTime = 0;
+static volatile int8_t g_encoderDelta = 0; // 编码器变化量
+static volatile bool g_buttonPressed = false;
+static uint8_t g_lastEncState = 0;
 
-// 选择当前使用的 LUT（可切换测试）
-#define USE_BEST_QUALITY 1 // 1=极致画质, 0=长寿命平衡
+// 函数前向声明
+void updateDisplay();
 
 // ==========================================
 // 底层命令函数
@@ -265,32 +110,18 @@ void writeDataArray(const uint8_t *data, size_t len) {
 
 void loadCustomLUT() {
   writeCommand(0x32);
-#if USE_BEST_QUALITY
   writeDataArray(LUT_BEST_QUALITY, 70);
-  Serial.println(">> LUT_BEST_QUALITY loaded");
-#else
-  writeDataArray(LUT_LONGEVITY_HQ, 70);
-  Serial.println(">> LUT_LONGEVITY_HQ loaded");
-#endif
 }
 
-// 设置优化的驱动电压
 void setOptimizedVoltage() {
-  // VCOM 电压 (0x2C) - 调整可影响对比度
   writeCommand(0x2C);
-  writeData(0x55); // 略微提高VCOM，增强对比度 (原值0x26)
-
-  // Gate 驱动电压 (0x03)
+  writeData(0x55);
   writeCommand(0x03);
-  writeData(0x17); // 20V (原值0x15=19V)
-
-  // Source 驱动电压 (0x04)
+  writeData(0x17);
   writeCommand(0x04);
-  writeData(0x41); // VSH1 15V
-  writeData(0xA8); // VSH2 5V
-  writeData(0x32); // VSL -15V
-
-  Serial.println(">> Optimized voltage set");
+  writeData(0x41);
+  writeData(0xA8);
+  writeData(0x32);
 }
 
 void waitBusyWithMargin() {
@@ -301,7 +132,50 @@ void waitBusyWithMargin() {
 }
 
 // ==========================================
-// 刷新节流（保护屏幕寿命）
+// 编码器中断处理（增强防抖）
+// ==========================================
+static volatile int8_t g_encoderSteps = 0; // 累积步数
+
+void IRAM_ATTR encoderISR() {
+  uint8_t a = digitalRead(PIN_ENC_A);
+  uint8_t b = digitalRead(PIN_ENC_B);
+  uint8_t state = (a << 1) | b;
+
+  // 状态机检测旋转方向
+  static const int8_t encTable[16] = {0,  -1, 1, 0, 1, 0, 0,  -1,
+                                      -1, 0,  0, 1, 0, 1, -1, 0};
+
+  int8_t delta = encTable[(g_lastEncState << 2) | state];
+  g_lastEncState = state;
+
+  // 累积步数
+  g_encoderSteps += delta;
+
+  // 只有累积到完整脉冲（4步=1格）才触发
+  if (g_encoderSteps >= 4) {
+    g_encoderDelta--; // 逆时针加（反转）
+    g_encoderSteps = 0;
+  } else if (g_encoderSteps <= -4) {
+    g_encoderDelta++; // 顺时针减（反转）
+    g_encoderSteps = 0;
+  }
+}
+
+void IRAM_ATTR buttonISR() {
+  static unsigned long lastTime = 0;
+  unsigned long now = millis();
+
+  if (now - lastTime < 200)
+    return; // 按键防抖 200ms
+  lastTime = now;
+
+  if (digitalRead(PIN_ENC_BTN) == LOW) {
+    g_buttonPressed = true;
+  }
+}
+
+// ==========================================
+// 刷新控制
 // ==========================================
 void enforceRefreshInterval() {
   unsigned long now = millis();
@@ -310,23 +184,19 @@ void enforceRefreshInterval() {
   if (elapsed < MIN_REFRESH_INTERVAL_MS) {
     delay(MIN_REFRESH_INTERVAL_MS - elapsed);
   }
-
   g_lastRefreshTime = millis();
 }
 
-// ==========================================
-// 对比度恢复（温和版）
-// ==========================================
+// 深度恢复（黑白交替）
 void contrastRecovery() {
-  Serial.println(">> [Recovery] Gentle contrast recovery...");
+  Serial.println(">> [Recovery] Deep recovery...");
   display.setFullWindow();
 
-  // 温和的黑白交替（只1次循环，减少应力）
   display.firstPage();
   do {
     display.fillScreen(GxEPD_BLACK);
   } while (display.nextPage());
-  delay(100); // 更长的稳定时间
+  delay(100);
 
   display.firstPage();
   do {
@@ -334,15 +204,15 @@ void contrastRecovery() {
   } while (display.nextPage());
   delay(100);
 
-  // 重新加载 LUT 和电压设置
   setOptimizedVoltage();
   loadCustomLUT();
-
   Serial.println(">> [Recovery] Done.");
 }
 
-// 轻度恢复（只闪白，不做全黑）
+// 轻度恢复（闪白）
 void lightRecovery() {
+  display.setPartialWindow(ZONE_COUNTER.x, ZONE_COUNTER.y, ZONE_COUNTER.w,
+                           ZONE_COUNTER.h);
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
@@ -350,46 +220,83 @@ void lightRecovery() {
   waitBusyWithMargin();
 }
 
+// 强制全刷（按键触发）
+void forceFullRefresh() {
+  Serial.println(">> [Button] Force full refresh!");
+
+  display.setFullWindow();
+
+  // 黑白交替清屏
+  for (int i = 0; i < 2; i++) {
+    display.firstPage();
+    do {
+      display.fillScreen(GxEPD_BLACK);
+    } while (display.nextPage());
+    delay(50);
+    display.firstPage();
+    do {
+      display.fillScreen(GxEPD_WHITE);
+    } while (display.nextPage());
+    delay(50);
+  }
+
+  // 重新显示当前数字
+  setOptimizedVoltage();
+  loadCustomLUT();
+  g_partialCount = 0; // 重置计数器
+
+  // 显示当前值
+  updateDisplay();
+}
+
 void checkRecovery() {
   g_partialCount++;
 
-  // 深度恢复（黑白交替）
   if (g_partialCount >= CONTRAST_RECOVERY_N) {
     contrastRecovery();
     g_partialCount = 0;
     return;
   }
 
-  // 轻度恢复（闪白）
   if ((g_partialCount % FLASH_WHITE_N) == 0) {
     lightRecovery();
   }
 }
 
 // ==========================================
-// 高画质局部刷新
+// 显示更新
 // ==========================================
-void hqPartialRefresh(const RefreshZone &zone, int value) {
-  // 刷新节流
+void updateDisplay() {
   enforceRefreshInterval();
-
-  // 检查恢复
   checkRecovery();
 
-  // 设置局部窗口
-  display.setPartialWindow(zone.x, zone.y, zone.w, zone.h);
+  display.setPartialWindow(ZONE_COUNTER.x, ZONE_COUNTER.y, ZONE_COUNTER.w,
+                           ZONE_COUNTER.h);
 
-  // 绘制内容
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
-    display.drawRect(zone.x, zone.y, zone.w, zone.h, GxEPD_BLACK);
-    display.setCursor(zone.x + 15, zone.y + 10);
+
+    // 绘制边框
+    display.drawRect(ZONE_COUNTER.x, ZONE_COUNTER.y, ZONE_COUNTER.w,
+                     ZONE_COUNTER.h, GxEPD_BLACK);
+
+    // 显示数字（居中）
     display.setTextColor(GxEPD_BLACK);
-    display.setTextSize(4);
-    display.print(value % 10);
+    display.setTextSize(5);
+
+    // 计算文本位置（简单居中）
+    int16_t textX = ZONE_COUNTER.x + 20;
+    int16_t textY = ZONE_COUNTER.y + 15;
+
+    display.setCursor(textX, textY);
+    display.printf("%3d", g_displayValue);
+
   } while (display.nextPage());
   waitBusyWithMargin();
+
+  Serial.printf(">> Display: %d (partial #%d)\n", g_displayValue,
+                g_partialCount);
 }
 
 // ==========================================
@@ -399,21 +306,38 @@ void setup() {
   Serial.begin(115200);
   delay(100);
   Serial.println("\n========================================");
-  Serial.println("   IL3897 Longevity + HQ Demo");
+  Serial.println("   IL3897 Encoder Control Demo");
   Serial.println("========================================\n");
 
+  // 初始化墨水屏引脚
   pinMode(PIN_DC, OUTPUT);
   pinMode(PIN_CS, OUTPUT);
   digitalWrite(PIN_CS, HIGH);
 
+  // 初始化编码器引脚
+  pinMode(PIN_ENC_A, INPUT_PULLUP);
+  pinMode(PIN_ENC_B, INPUT_PULLUP);
+  pinMode(PIN_ENC_BTN, INPUT_PULLUP);
+
+  // 读取初始状态
+  g_lastEncState = (digitalRead(PIN_ENC_A) << 1) | digitalRead(PIN_ENC_B);
+
+  // 注册中断
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), encoderISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encoderISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_BTN), buttonISR, FALLING);
+
+  // SPI 初始化
   SPI.end();
   SPI.begin(PIN_SCK, -1, PIN_MOSI, PIN_CS);
 
+  // 墨水屏初始化
   display.init(115200, true, 2, false);
   display.epd2.selectSPI(SPI, SPISettings(SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
   display.setRotation(1);
 
   // 初始全刷清屏
+  Serial.println(">> Initial clear...");
   display.setFullWindow();
   display.firstPage();
   do {
@@ -421,30 +345,53 @@ void setup() {
   } while (display.nextPage());
   delay(300);
 
-  // 设置优化电压和加载自定义LUT
+  // 加载优化设置
   setOptimizedVoltage();
   loadCustomLUT();
 
-  // 高画质局刷演示
-  Serial.println("\n>> High Quality + Longevity Demo...\n");
-  Serial.printf("   Min refresh interval: %d ms\n", MIN_REFRESH_INTERVAL_MS);
-  Serial.printf("   Light recovery every: %d frames\n", FLASH_WHITE_N);
-  Serial.printf("   Deep recovery every:  %d frames\n\n", CONTRAST_RECOVERY_N);
+  // 显示初始值
+  updateDisplay();
 
-  unsigned long totalStart = millis();
-
-  for (int i = 0; i < DEMO_LOOP_COUNT; i++) {
-    unsigned long frameStart = millis();
-    hqPartialRefresh(ZONE_COUNTER, i);
-    Serial.printf("Frame %02d | Time: %3lu ms\n", i, millis() - frameStart);
-  }
-
-  unsigned long totalTime = millis() - totalStart;
-  Serial.printf("\n>> Total: %lu ms, Avg: %.1f ms/frame\n", totalTime,
-                (float)totalTime / DEMO_LOOP_COUNT);
-
-  display.hibernate();
-  Serial.println(">> Done. Display hibernating.");
+  Serial.println("\n>> Ready! Rotate encoder to change value.");
+  Serial.println(">> Press encoder button for full refresh.\n");
 }
 
-void loop() { delay(10000); }
+// ==========================================
+// 主循环
+// ==========================================
+void loop() {
+  static unsigned long lastUpdateTime = 0;
+
+  // 检查按键
+  if (g_buttonPressed) {
+    g_buttonPressed = false;
+    forceFullRefresh();
+    lastUpdateTime = millis();
+  }
+
+  // 检查编码器旋转（带防抖间隔）
+  if (g_encoderDelta != 0) {
+    unsigned long now = millis();
+
+    // 防抖：距离上次刷新至少间隔 200ms
+    if (now - lastUpdateTime >= 200) {
+      noInterrupts();
+      int8_t delta = g_encoderDelta;
+      g_encoderDelta = 0;
+      interrupts();
+
+      g_displayValue += delta;
+
+      // 限制范围 0-999
+      if (g_displayValue < 0)
+        g_displayValue = 0;
+      if (g_displayValue > 999)
+        g_displayValue = 999;
+
+      updateDisplay();
+      lastUpdateTime = now;
+    }
+  }
+
+  delay(10); // 降低 CPU 占用
+}
