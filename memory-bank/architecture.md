@@ -17,12 +17,14 @@
 │   └── .pio/                    # 编译输出
 ├── doc/
 │   ├── IL3897墨水屏开发指南.md    # 开发文档
-│   └── 硬件IO定义_v1.0.md        # 硬件引脚定义
+│   ├── 硬件IO定义_v1.0.md        # 硬件引脚定义
+│   └── README_GENERATION_PROMPT.md # 文档生成提示词
 ├── 例程/
 │   └── il3879epdtest.txt        # 参考例程
-└── memory-bank/
-    ├── architecture.md          # 本文档
-    └── progress.md              # 进度记录
+├── memory-bank/
+│   ├── architecture.md          # 本文档
+│   └── progress.md              # 进度记录
+└── README.md                    # 项目主页文档
 ```
 
 ## 核心模块

@@ -24,6 +24,8 @@
 - [x] 实现刷新策略：每3次闪白、每20次深度恢复
 - [x] 创建 `doc/IL3897墨水屏开发指南.md`
 - [x] 创建 `doc/硬件IO定义_v1.0.md`
+- [x] 生成标准化 `README.md` (含 Badges)
+- [x] 创建 `doc/README_GENERATION_PROMPT.md` 用于标准化文档生成
 
 ## 版本历史
 
