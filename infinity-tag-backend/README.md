@@ -33,8 +33,8 @@ vim .env
 mysql -u root -p
 CREATE DATABASE infinity_tag CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-# 运行数据库迁移
-python scripts/init_db.py
+# 运行数据库迁移 (Alembic)
+alembic upgrade head
 ```
 
 ### 3. 启动开发服务器
