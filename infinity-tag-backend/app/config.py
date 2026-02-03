@@ -57,7 +57,8 @@ class Settings(BaseSettings):
     AI_API_KEY: str  # 必须在环境变量中配置
     AI_MODEL_NAME: str = "doubao-seed-1-6-250615"
     AI_BASE_URL: str = "https://www.dmxapi.cn/v1"
-    AI_TIMEOUT: int = 30
+    AI_TIMEOUT: int = 30  # 请求超时时间(秒)
+    AI_MAX_RETRIES: int = 2  # 失败重试次数
 
     # ====================================
     # JWT 配置
