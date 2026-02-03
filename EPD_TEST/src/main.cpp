@@ -5,7 +5,7 @@
 
 /*
  * IL3897 (B72) 编码器控制版
- * 版本: V1.0.0.2
+ * 版本: V1.0.0.6 (震动检测降敏: 阈值6次, 消抖80ms)
  */
 
 // ==========================================
@@ -14,7 +14,7 @@
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 0
 #define VERSION_PATCH 0
-#define VERSION_BUILD 2
+#define VERSION_BUILD 6
 
 // ==========================================
 // 硬件引脚配置
@@ -30,6 +30,9 @@
 #define PIN_ENC_B 39
 #define PIN_ENC_BTN 38
 
+// 特殊IO: 震动开关
+#define PIN_SW_KEY 48
+
 // ==========================================
 // 性能参数配置
 // ==========================================
@@ -41,6 +44,14 @@
 
 #define SCREEN_WIDTH 250
 #define SCREEN_HEIGHT 122
+
+// ==========================================
+// 震动检测参数 (已调整: 降低灵敏度)
+// ==========================================
+#define VIB_ISR_DEBOUNCE 80   // ISR级消抖: 80ms (过滤拿放时的误触)
+#define VIB_WINDOW_MS 1000    // 计数窗口: 1000ms
+#define VIB_THRESHOLD_COUNT 6 // 触发阈值: 1秒内需触发6次 (需剧烈摇晃)
+#define VIB_COOLDOWN_MS 500   // 动作冷却: 500ms
 
 // ==========================================
 // 刷新区域定义
@@ -65,6 +76,7 @@ static uint16_t g_partialCount = 0;
 static unsigned long g_lastRefreshTime = 0;
 static volatile int8_t g_encoderDelta = 0;
 static volatile bool g_buttonPressed = false;
+static volatile bool g_vibrationTriggered = false; // 震动触发标志
 static uint8_t g_lastEncState = 0;
 static volatile int8_t g_encoderSteps = 0;
 
@@ -85,8 +97,10 @@ void waitBusyWithMargin() {
 }
 
 // ==========================================
-// 编码器中断处理
+// 中断处理 (ISR)
 // ==========================================
+
+// 编码器
 void IRAM_ATTR encoderISR() {
   uint8_t a = digitalRead(PIN_ENC_A);
   uint8_t b = digitalRead(PIN_ENC_B);
@@ -108,6 +122,7 @@ void IRAM_ATTR encoderISR() {
   }
 }
 
+// 编码器按键
 void IRAM_ATTR buttonISR() {
   static unsigned long lastTime = 0;
   unsigned long now = millis();
@@ -117,6 +132,16 @@ void IRAM_ATTR buttonISR() {
   if (digitalRead(PIN_ENC_BTN) == LOW) {
     g_buttonPressed = true;
   }
+}
+
+// 震动开关
+void IRAM_ATTR vibrationISR() {
+  static unsigned long lastTime = 0;
+  unsigned long now = millis();
+  if (now - lastTime < VIB_ISR_DEBOUNCE)
+    return;
+  lastTime = now;
+  g_vibrationTriggered = true;
 }
 
 // ==========================================
@@ -186,7 +211,7 @@ void lightRecovery() {
 void contrastRecovery() {
   Serial.println(">> [Recovery] Contrast recovery");
 
-  // 使用局刷方式做全屏黑白（避免触发库的多闪LUT）
+  // 使用局刷方式做全屏黑白
   display.setPartialWindow(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
   display.firstPage();
@@ -271,11 +296,16 @@ void setup() {
   pinMode(PIN_ENC_B, INPUT_PULLUP);
   pinMode(PIN_ENC_BTN, INPUT_PULLUP);
 
+  // 震动开关引脚
+  pinMode(PIN_SW_KEY, INPUT_PULLUP);
+
   g_lastEncState = (digitalRead(PIN_ENC_A) << 1) | digitalRead(PIN_ENC_B);
 
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), encoderISR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encoderISR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_BTN), buttonISR, FALLING);
+
+  attachInterrupt(digitalPinToInterrupt(PIN_SW_KEY), vibrationISR, FALLING);
 
   // SPI 初始化
   SPI.end();
@@ -286,7 +316,7 @@ void setup() {
   display.epd2.selectSPI(SPI, SPISettings(SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
   display.setRotation(1);
 
-  // 初始清屏（使用库的标准方法）
+  // 初始清屏
   Serial.println(">> Initial clear...");
   display.setFullWindow();
   display.firstPage();
@@ -298,27 +328,30 @@ void setup() {
   drawContent();
   drawVersion();
 
-  Serial.println("\n>> Ready! Rotate encoder to change value.");
-  Serial.println(">> Press button for full refresh.\n");
+  Serial.println("\n>> Ready! Rotate encoder or shake device.");
 }
 
 // ==========================================
 // 主循环
 // ==========================================
 void loop() {
-  static unsigned long lastUpdateTime = 0;
+  static unsigned long lastUpdateEncoderTime = 0;
 
-  // 检查按键
+  // 震动检测状态变量
+  static unsigned long vibDetectionStart = 0; // 窗口开始时间
+  static int vibShakeCount = 0;               // 窗口内计数
+  static unsigned long vibLastActionTime = 0; // 上次动作时间(冷却用)
+
+  // 1. 检查按键 (强制刷新)
   if (g_buttonPressed) {
     g_buttonPressed = false;
     forceFullRefresh();
-    lastUpdateTime = millis();
   }
 
-  // 检查编码器
+  // 2. 检查编码器 (数字变化)
   if (g_encoderDelta != 0) {
     unsigned long now = millis();
-    if (now - lastUpdateTime >= 200) {
+    if (now - lastUpdateEncoderTime >= 200) {
       noInterrupts();
       int8_t delta = g_encoderDelta;
       g_encoderDelta = 0;
@@ -331,8 +364,46 @@ void loop() {
         g_displayValue = 999;
 
       updateDisplay();
-      lastUpdateTime = now;
+      lastUpdateEncoderTime = now;
     }
+  }
+
+  // 3. 检查震动开关 (Shake Action 降敏版)
+  if (g_vibrationTriggered) {
+    g_vibrationTriggered = false; // 清除 ISR 标志
+    unsigned long now = millis();
+
+    // A. 冷却检查
+    if (now - vibLastActionTime > VIB_COOLDOWN_MS) {
+
+      // B. 窗口管理
+      if (vibShakeCount == 0 || (now - vibDetectionStart > VIB_WINDOW_MS)) {
+        // 新窗口
+        vibShakeCount = 1;
+        vibDetectionStart = now;
+      } else {
+        // 窗口内累加
+        vibShakeCount++;
+      }
+
+      // C. 阈值检查 (6次)
+      if (vibShakeCount >= VIB_THRESHOLD_COUNT) {
+        Serial.println(">> [Vibration] Shake Action Triggered! (+1)");
+        g_displayValue++;
+        if (g_displayValue > 999)
+          g_displayValue = 999;
+
+        updateDisplay();
+
+        vibLastActionTime = now; // 进入冷却
+        vibShakeCount = 0;       // 重置
+      }
+    }
+  }
+
+  // D. 窗口自动过期复位 (可选)
+  if (vibShakeCount > 0 && (millis() - vibDetectionStart > VIB_WINDOW_MS)) {
+    vibShakeCount = 0;
   }
 
   delay(10);
