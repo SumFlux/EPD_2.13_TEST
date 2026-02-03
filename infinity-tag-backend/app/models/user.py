@@ -42,7 +42,7 @@ class UserProfile(BaseModel):
     is_lunar = Column(Boolean, default=False, comment="是否为农历生日")
 
     # 扩展信息
-    mbti = Column(String(4), nullable=True, comment="MBTI人格")
+    occupation = Column(String(32), nullable=True, comment="职业/身份")
     notes = Column(Text, nullable=True, comment="备注")
 
     # 关联

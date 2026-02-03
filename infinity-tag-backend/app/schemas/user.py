@@ -36,7 +36,7 @@ class UserProfileBase(BaseModel):
     birth_hour: int = Field(-1, ge=-1, le=23, description="出生时辰 (0-23, -1为未知)")
 
     is_lunar: bool = Field(False, description="是否为农历生日")
-    mbti: Optional[str] = Field(None, max_length=4, description="MBTI人格 (如 INTJ)")
+    occupation: Optional[str] = Field(None, max_length=32, description="职业/身份 (如 程序员)")
     notes: Optional[str] = Field(None, description="备注")
 
 

@@ -38,9 +38,22 @@ class AlmanacService:
 
         if cached_almanac:
             logger.info(f"Cache Hit: User {user_id} Date {target_date}")
-            # 补全 Pydantic 模型所需的 date 字段（数据库对象转dict需要注意）
-            # Pydantic from_attributes=True 可以处理 ORM 对象
-            return AlmanacResponse.model_validate(cached_almanac)
+
+            # 手动将 ORM 对象转为 dict，并处理特殊字段
+            data = cached_almanac.to_dict()
+
+            # 处理字符串转列表 (数据库存的是 "宜1,宜2")
+            if isinstance(data.get("auspicious"), str):
+                data["auspicious"] = data["auspicious"].split(",") if data["auspicious"] else []
+            if isinstance(data.get("inauspicious"), str):
+                data["inauspicious"] = data["inauspicious"].split(",") if data["inauspicious"] else []
+
+            # 补充农历日期 (数据库没存这个，需要实时算一下)
+            from app.utils.lunar import LunarUtils
+            lunar_info = LunarUtils.solar_to_lunar(target_date)
+            data["lunar_date_str"] = lunar_info["full"]
+
+            return AlmanacResponse(**data)
 
         logger.info(f"Cache Miss: Generating for User {user_id} Date {target_date}")
 

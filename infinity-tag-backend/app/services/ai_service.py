@@ -90,7 +90,7 @@ class AIService:
             month_pillar=user_bazi['month'],
             day_pillar=user_bazi['day'],
             hour_pillar=user_bazi['hour'],
-            mbti=profile.mbti or "未知",
+            occupation=profile.occupation or "未知",
             date=target_date.isoformat(),
             weekday=target_date.strftime("%A"),
             lunar_date_str=today_lunar['full'],
@@ -107,7 +107,8 @@ class AIService:
 
         for attempt in range(self.max_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # 禁用 HTTP/2 以提高兼容性，显式设置超时
+                async with httpx.AsyncClient(timeout=self.timeout, http2=False) as client:
                     logger.info(f"AI Request (Attempt {attempt+1}): {settings.AI_MODEL_NAME}")
 
                     response = await client.post(
@@ -117,7 +118,7 @@ class AIService:
                             "model": self.model,
                             "messages": messages,
                             "temperature": 0.7, # 稍微有创意一点，但不要太发散
-                            "max_tokens": 1000
+                            "max_tokens": 2000
                         }
                     )
 

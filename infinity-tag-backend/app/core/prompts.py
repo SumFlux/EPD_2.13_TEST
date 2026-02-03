@@ -53,7 +53,7 @@ ALMANAC_USER_PROMPT_TEMPLATE = """
   - 月柱: {month_pillar}
   - 日柱: {day_pillar}
   - 时柱: {hour_pillar}
-- MBTI: {mbti} (参考性格特质)
+- 职业/身份: {occupation}
 
 【今日信息】
 - 公历: {date} {weekday}

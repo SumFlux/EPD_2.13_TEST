@@ -104,11 +104,10 @@ class LunarUtils:
         day_obj = sxtwl.fromSolar(year, month, day)
 
         # 2. 获取年、月、日柱 (True = 严格按节气换柱)
-        # sxtwl 的 getYearGZ/getMonthGZ 传入 True 表示以节气为准
-        # getYearGZ(True) -> 以立春为界
-        # getMonthGZ(True) -> 以节气为界
+        # sxtwl 的 getYearGZ 传入 True 表示以立春为界 (八字年柱)
+        # sxtwl 的 getMonthGZ 默认就是以节气为界，不需要参数
         y_gz = day_obj.getYearGZ(True)
-        m_gz = day_obj.getMonthGZ(True)
+        m_gz = day_obj.getMonthGZ()
         d_gz = day_obj.getDayGZ()
 
         # 3. 计算时柱

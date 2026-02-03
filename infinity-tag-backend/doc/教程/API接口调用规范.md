@@ -88,7 +88,7 @@ Authorization: Bearer <your_access_token>
   "birth_day": 20,
   "birth_hour": 14,     // 0-23, 若不知道时辰传 -1
   "is_lunar": false,    // false:公历(阳历), true:农历(阴历)
-  "mbti": "INTJ",       // 可选
+  "occupation": "程序员", // 可选，职业信息 (替换原MBTI)
   "notes": "备注信息"    // 可选
 }
 ```
