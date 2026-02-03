@@ -1,4 +1,20 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(where:*)",
+      "Bash(py:*)",
+      "Bash(if not exist .env copy .env.example .env)",
+      "Bash(.venvScriptspython:*)",
+      "Bash(mysql:*)",
+      "Bash(sc query:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)",
+      "Bash(./venv/Scripts/python:*)"
+    ]
+  },
+  "enabledPlugins": {
+    "everything-claude-code@everything-claude-code": true
+  },
   "extraKnownMarketplaces": {
     "everything-claude-code": {
       "source": {
@@ -6,8 +22,5 @@
         "repo": "affaan-m/everything-claude-code"
       }
     }
-  },
-  "enabledPlugins": {
-    "everything-claude-code@everything-claude-code": true
   }
 }
