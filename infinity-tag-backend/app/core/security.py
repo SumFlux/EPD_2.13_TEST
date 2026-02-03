@@ -1,11 +1,13 @@
 """
 安全工具库
-处理密码哈希和 JWT Token
+处理密码哈希、JWT Token 和 HMAC 签名
 """
 from datetime import datetime, timedelta
 from typing import Optional, Any
 from passlib.context import CryptContext
 from jose import jwt
+import hmac
+import hashlib
 from app.config import settings
 
 # 密码哈希上下文
@@ -45,3 +47,44 @@ def create_access_token(subject: Any, expires_delta: Optional[timedelta] = None)
         algorithm=settings.JWT_ALGORITHM
     )
     return encoded_jwt
+
+
+class SecurityService:
+    """安全服务封装"""
+
+    @staticmethod
+    def generate_hmac_signature(
+        payload: str,
+        secret: str,
+        timestamp: int
+    ) -> str:
+        """生成 HMAC-SHA256 签名"""
+        message = f"{payload}:{timestamp}"
+        signature = hmac.new(
+            secret.encode(),
+            message.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        return signature
+
+    @staticmethod
+    def verify_hmac_signature(
+        payload: str,
+        signature: str,
+        secret: str,
+        timestamp: int,
+        tolerance_seconds: int = 300
+    ) -> bool:
+        """验证签名（含时间戳检查，防重放攻击）"""
+        # 检查时间戳
+        current_timestamp = int(datetime.utcnow().timestamp())
+        if abs(current_timestamp - timestamp) > tolerance_seconds:
+            return False
+
+        # 计算期望签名
+        expected = SecurityService.generate_hmac_signature(
+            payload, secret, timestamp
+        )
+
+        # 恒定时间比较（防时序攻击）
+        return hmac.compare_digest(signature, expected)

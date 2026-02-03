@@ -1,69 +1,111 @@
-"""
-认证服务
-处理设备激活、登录与 Token 签发
-"""
+from typing import Optional, Dict, Any, Union
 from datetime import datetime
+from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from fastapi import HTTPException, status
-
 from app.models.user import User
-from app.schemas.user import DeviceActivateRequest, TokenResponse
-from app.core.security import create_access_token
-from app.config import settings
-
+from app.core.security import verify_password, get_password_hash, create_access_token
+from app.utils.device_code_gen import generate_device_id
+from app.schemas.auth import ActivateResponse, LoginResponse
+import uuid
 
 class AuthService:
-    """认证业务逻辑"""
+    """认证服务"""
 
     @staticmethod
-    async def activate_device(db: AsyncSession, data: DeviceActivateRequest) -> TokenResponse:
+    async def activate_device(
+        db: AsyncSession,
+        device_id: Optional[str],
+        password: str
+    ) -> ActivateResponse:
         """
-        激活或登录设备
-        :param db: 数据库会话
-        :param data: 激活参数 (device_code, device_uuid)
-        :return: Token响应
+        激活或注册设备
+        如果 device_id 为空，则生成新的设备码
         """
-        # 1. 查询设备是否存在
-        stmt = select(User).where(User.device_code == data.device_code)
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
-
-        if not user:
-            # 2. 不存在则注册新设备
-            user = User(
-                device_code=data.device_code,
-                device_uuid=data.device_uuid,
-                is_active=True,
-                last_login_at=datetime.now().isoformat()
-            )
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
+        # 1. 验证或生成设备码
+        if not device_id:
+            device_id = generate_device_id()
+            # 确保唯一性
+            while True:
+                existing = await db.execute(select(User).where(User.device_id == device_id))
+                if not existing.scalars().first():
+                    break
+                device_id = generate_device_id()
         else:
-            # 3. 存在则验证与更新
-            # 安全检查: 如果数据库中已绑定 UUID，且请求中也带了 UUID，则必须一致
-            if user.device_uuid and data.device_uuid:
-                if user.device_uuid != data.device_uuid:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="设备硬件ID不匹配，拒绝访问"
-                    )
+            # 检查是否已存在
+            result = await db.execute(select(User).where(User.device_id == device_id))
+            if result.scalars().first():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="设备ID已存在，请直接登录"
+                )
 
-            # 如果之前没绑定 UUID，现在绑定
-            if not user.device_uuid and data.device_uuid:
-                user.device_uuid = data.device_uuid
+        # 2. 生成设备密钥 (HMAC Secret)
+        device_secret = uuid.uuid4().hex
 
-            # 更新最后登录时间
-            user.last_login_at = datetime.now().isoformat()
-            await db.commit()
+        # 3. 创建用户
+        user = User(
+            device_id=device_id,
+            password_hash=get_password_hash(password),
+            device_secret=device_secret,
+            activated_at=datetime.utcnow(),
+            last_login_at=datetime.utcnow()
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
 
-        # 4. 签发 Token (Subject 使用 User ID)
-        access_token = create_access_token(
-            subject=user.id
+        # 4. 生成 Token
+        access_token = create_access_token(subject=user.id)
+
+        # 5. 返回 Pydantic 模型，避免直接返回 ORM 对象
+        return ActivateResponse(
+            access_token=access_token,
+            device_secret=device_secret,
+            user_id=user.id,
+            device_id=user.device_id
         )
 
-        return TokenResponse(
-            access_token=access_token,
-            expires_in=settings.JWT_EXPIRATION_HOURS * 3600
+    @staticmethod
+    async def authenticate_user(
+        db: AsyncSession,
+        device_id: str,
+        password: str
+    ) -> Optional[User]:
+        """验证用户凭据"""
+        result = await db.execute(select(User).where(User.device_id == device_id))
+        user = result.scalars().first()
+
+        if not user:
+            return None
+
+        if not verify_password(password, user.password_hash):
+            return None
+
+        return user
+
+    @staticmethod
+    async def login(
+        db: AsyncSession,
+        device_id: str,
+        password: str
+    ) -> LoginResponse:
+        """登录逻辑"""
+        user = await AuthService.authenticate_user(db, device_id, password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="设备ID或密码错误",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # 更新最后登录时间
+        user.last_login_at = datetime.utcnow()
+        await db.commit()
+
+        access_token = create_access_token(subject=user.id)
+
+        # 登录仅返回 Token，不返回 device_secret
+        return LoginResponse(
+            access_token=access_token
         )

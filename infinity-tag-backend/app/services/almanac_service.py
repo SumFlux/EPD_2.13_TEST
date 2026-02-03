@@ -1,123 +1,116 @@
-"""
-黄历服务
-核心业务逻辑：协调 AI 生成与数据库缓存
-"""
-from datetime import date
+from typing import Optional, List, Dict, Any
+from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from fastapi import HTTPException, status
-from loguru import logger
-
+from sqlalchemy import select, and_
 from app.models.almanac import AlmanacHistory
 from app.models.user import UserProfile
-from app.schemas.almanac import AlmanacResponse
-from app.services.ai_service import ai_service
-from app.services.user_service import UserService
-
+from app.utils.lunar import LunarUtils
+from app.core.ai_service import ai_service
+import random
 
 class AlmanacService:
-    """黄历业务逻辑"""
+    """黄历服务"""
 
     @staticmethod
-    async def get_daily_almanac(
+    async def get_almanac_by_date(
         db: AsyncSession,
         user_id: int,
         target_date: date
-    ) -> AlmanacResponse:
-        """
-        获取指定日期的黄历
-        策略: 优先查库 -> 库中无则调用AI生成 -> 存库并返回
-        """
-        # 1. 查库 (Cache Check)
-        stmt = select(AlmanacHistory).where(
-            AlmanacHistory.user_id == user_id,
-            AlmanacHistory.date == target_date
+    ) -> Optional[AlmanacHistory]:
+        """查询指定日期的黄历"""
+        result = await db.execute(
+            select(AlmanacHistory).where(
+                and_(
+                    AlmanacHistory.user_id == user_id,
+                    AlmanacHistory.date == target_date
+                )
+            )
         )
-        result = await db.execute(stmt)
-        cached_almanac = result.scalar_one_or_none()
+        return result.scalars().first()
 
-        if cached_almanac:
-            logger.info(f"Cache Hit: User {user_id} Date {target_date}")
+    @staticmethod
+    async def get_history(
+        db: AsyncSession,
+        user_id: int,
+        limit: int = 30
+    ) -> List[AlmanacHistory]:
+        """查询历史黄历"""
+        result = await db.execute(
+            select(AlmanacHistory)
+            .where(AlmanacHistory.user_id == user_id)
+            .order_by(AlmanacHistory.date.desc())
+            .limit(limit)
+        )
+        return result.scalars().all()
 
-            # 手动将 ORM 对象转为 dict，并处理特殊字段
-            data = cached_almanac.to_dict()
+    @staticmethod
+    async def generate_almanac(
+        db: AsyncSession,
+        user_id: int,
+        profile: UserProfile,
+        target_date: date
+    ) -> AlmanacHistory:
+        """
+        生成黄历 (核心逻辑)
+        如果已存在则直接返回
+        """
+        # 1. 检查缓存
+        cached = await AlmanacService.get_almanac_by_date(db, user_id, target_date)
+        if cached:
+            return cached
 
-            # 处理字符串转列表 (数据库存的是 "宜1,宜2")
-            if isinstance(data.get("auspicious"), str):
-                data["auspicious"] = data["auspicious"].split(",") if data["auspicious"] else []
-            if isinstance(data.get("inauspicious"), str):
-                data["inauspicious"] = data["inauspicious"].split(",") if data["inauspicious"] else []
+        # 2. 计算日历信息
+        lunar_info = LunarUtils.solar_to_lunar(target_date)
+        # 获取当日干支 (需要准确的日柱)
+        bazi_today = LunarUtils.get_ba_zi(target_date.year, target_date.month, target_date.day)
 
-            # 补充农历日期 (数据库没存这个，需要实时算一下)
-            from app.utils.lunar import LunarUtils
-            lunar_info = LunarUtils.solar_to_lunar(target_date)
-            data["lunar_date_str"] = lunar_info["full"]
+        # 3. 生成基础运势 (Mock 算法，后续可接入真实运势库)
+        favorable_pool = ["祭祀", "祈福", "求嗣", "开光", "出行", "解除", "伐木", "拆卸", "修造", "安床"]
+        unfavorable_pool = ["嫁娶", "移徙", "入宅", "开市", "交易", "安门", "安葬"]
 
-            return AlmanacResponse(**data)
+        favorable = random.sample(favorable_pool, k=3)
+        unfavorable = random.sample(unfavorable_pool, k=3)
 
-        logger.info(f"Cache Miss: Generating for User {user_id} Date {target_date}")
+        lucky_items = ["红绳", "水晶", "桃木", "铜钱", "葫芦"]
+        lucky_directions = ["正东", "正西", "正南", "正北", "东南", "东北", "西南", "西北"]
 
-        # 2. 准备生成: 获取用户档案
-        profile = await UserService.get_profile(db, user_id)
-        if not profile:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="请先完善个人档案(设置生辰八字)才能生成黄历"
-            )
+        # 4. 调用 AI 生成批注
+        user_bazi = {
+            "year": profile.bazi_year,
+            "month": profile.bazi_month,
+            "day": profile.bazi_day,
+            "hour": profile.bazi_hour
+        }
 
-        # 3. 调用 AI 生成
-        # 注意: ai_service 返回的是字典数据 (core content)
         try:
-            ai_data = await ai_service.generate_almanac(profile, target_date)
-        except Exception as e:
-            logger.error(f"AI Generation Failed: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="AI 服务暂时不可用，请稍后重试"
+            commentary = await ai_service.generate_almanac_commentary(
+                bazi=user_bazi,
+                ganzhi_day=bazi_today['day'],
+                profession=profile.profession,
+                focus_areas=profile.focus_areas
             )
+        except Exception:
+            commentary = "今日运势平稳，宜静思己过，勿急躁冒进。"
 
-        # 4. 存入数据库
-        # 将 AI 返回的字典数据解包，填入模型
-        # 注意: AI 返回的字段必须与 AlmanacHistory 模型字段匹配
-        # 我们需要处理一下 list 类型的 auspicious/inauspicious 转字符串存储
-
-        # 将 list 转为 comma-separated string 存储到数据库
-        auspicious_str = ",".join(ai_data.get("auspicious", []))
-        inauspicious_str = ",".join(ai_data.get("inauspicious", []))
-
-        new_almanac = AlmanacHistory(
+        # 5. 保存到数据库
+        almanac = AlmanacHistory(
             user_id=user_id,
             date=target_date,
-            auspicious=auspicious_str,
-            inauspicious=inauspicious_str,
-            daily_fortune=ai_data.get("daily_fortune"),
-            lucky_color=ai_data.get("lucky_color"),
-            lucky_direction=ai_data.get("lucky_direction"),
-            lucky_time=ai_data.get("lucky_time"),
-            wealth_score=ai_data.get("wealth_score"),
-            health_score=ai_data.get("health_score"),
-            love_score=ai_data.get("love_score"),
-            career_score=ai_data.get("career_score")
+            lunar_date=lunar_info['full'], # e.g. 甲辰年正月初一
+            ganzhi_year=bazi_today['year'],
+            ganzhi_month=bazi_today['month'],
+            ganzhi_day=bazi_today['day'],
+            favorable=favorable,
+            unfavorable=unfavorable,
+            lucky_direction=random.choice(lucky_directions),
+            lucky_item=random.choice(lucky_items),
+            energy_level=random.randint(60, 95),
+            commentary=commentary,
+            generated_at=datetime.now()
         )
 
-        db.add(new_almanac)
+        db.add(almanac)
         await db.commit()
-        await db.refresh(new_almanac)
+        await db.refresh(almanac)
 
-        # 5. 返回结果
-        # 返回时，ORM 对象会自动将 comma string 转回 list 吗？不会。
-        # 我们需要在 Pydantic model_validate 之前手动处理，或者让 Pydantic validator 处理。
-        # 更简单的做法：构造一个临时的 dict 来返回，确保 auspicious 是 list
-
-        response_data = new_almanac.to_dict()
-        # 手动转换一下 list
-        response_data["auspicious"] = ai_data.get("auspicious", [])
-        response_data["inauspicious"] = ai_data.get("inauspicious", [])
-
-        # 补充农历日期字符串 (可选，这里简单从 LunarUtils 获取)
-        # 实际上 ai_service 并没有返回 lunar_date_str，我们可以补上
-        from app.utils.lunar import LunarUtils
-        lunar_info = LunarUtils.solar_to_lunar(target_date)
-        response_data["lunar_date_str"] = lunar_info["full"]
-
-        return AlmanacResponse(**response_data)
+        return almanac

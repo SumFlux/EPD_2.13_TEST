@@ -1,7 +1,3 @@
-"""
-API 依赖注入
-处理数据库会话获取与用户认证
-"""
 from typing import AsyncGenerator, Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -13,9 +9,8 @@ from app.core.database import AsyncSessionLocal
 from app.config import settings
 from app.models.user import User
 
-# 定义 OAuth2 认证方案 (Token URL 仅作为文档展示，实际使用 activate 接口)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"/api/v1/auth/activate")
-
+# 定义 OAuth2 认证方案
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"/api/v1/auth/login")
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
@@ -30,7 +25,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             await session.close()
-
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
@@ -67,9 +61,5 @@ async def get_current_user(
 
     if user is None:
         raise credentials_exception
-
-    # 检查用户是否被禁用 (可选)
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="用户已被禁用")
 
     return user

@@ -73,17 +73,17 @@ async def global_exception_handler(request, exc):
 @app.on_event("startup")
 async def startup_event():
     """应用启动时执行"""
-    print(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} 启动成功！")
-    print(f"📍 环境: {settings.ENVIRONMENT}")
-    print(f"🔒 HTTPS 强制: {'启用' if settings.FORCE_HTTPS else '禁用'}")
-    print(f"🗄️  数据库: {settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}")
-    print(f"🔴 Redis: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
+    print(f"[INFO] {settings.APP_NAME} v{settings.APP_VERSION} 启动成功！")
+    print(f"[ENV] 环境: {settings.ENVIRONMENT}")
+    print(f"[SEC] HTTPS 强制: {'启用' if settings.FORCE_HTTPS else '禁用'}")
+    print(f"[DB]  数据库: {settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}")
+    print(f"[RED] Redis: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭时执行"""
-    print(f"👋 {settings.APP_NAME} 正在关闭...")
+    print(f"[INFO] {settings.APP_NAME} 正在关闭...")
 
 
 # ====================================

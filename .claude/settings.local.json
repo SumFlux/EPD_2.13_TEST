@@ -9,7 +9,12 @@
       "Bash(sc query:*)",
       "Bash(docker:*)",
       "Bash(docker-compose:*)",
-      "Bash(./venv/Scripts/python:*)"
+      "Bash(./venv/Scripts/python:*)",
+      "Bash(alembic revision:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(python:*)",
+      "Bash(uvicorn:*)",
+      "Bash(pip install:*)"
     ]
   },
   "enabledPlugins": {

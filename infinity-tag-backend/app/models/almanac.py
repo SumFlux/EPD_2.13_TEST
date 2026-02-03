@@ -1,36 +1,35 @@
-"""
-黄历历史模型
-"""
-from sqlalchemy import Column, String, Integer, ForeignKey, Text, Date
+from sqlalchemy import Column, String, Integer, ForeignKey, Text, Date, JSON, UniqueConstraint, DateTime
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
-
+from datetime import datetime
 
 class AlmanacHistory(BaseModel):
     """
-    黄历历史记录
-    记录用户每天生成的个性化黄历
+    黄历历史模型
     """
     __tablename__ = "almanac_history"
 
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    date = Column(Date, nullable=False, index=True, comment="黄历日期")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
 
-    # 宜忌
-    auspicious = Column(String(255), nullable=True, comment="宜")
-    inauspicious = Column(String(255), nullable=True, comment="忌")
+    lunar_date = Column(String(20))
+    ganzhi_year = Column(String(10))
+    ganzhi_month = Column(String(10))
+    ganzhi_day = Column(String(10))
 
-    # AI 生成内容
-    daily_fortune = Column(Text, nullable=True, comment="今日运势")
-    lucky_color = Column(String(32), nullable=True, comment="幸运色")
-    lucky_direction = Column(String(32), nullable=True, comment="财神方位")
-    lucky_time = Column(String(64), nullable=True, comment="吉时")
+    favorable = Column(JSON, comment='宜事项')
+    unfavorable = Column(JSON, comment='忌事项')
 
-    # 结构化评分 (0-100)
-    wealth_score = Column(Integer, default=60, comment="财运分")
-    health_score = Column(Integer, default=60, comment="健康分")
-    love_score = Column(Integer, default=60, comment="桃花分")
-    career_score = Column(Integer, default=60, comment="事业分")
+    lucky_direction = Column(String(20))
+    lucky_item = Column(String(50))
+    energy_level = Column(Integer)
+
+    commentary = Column(Text, comment='AI批注')
+    generated_at = Column(DateTime, default=datetime.now)
 
     # 关联
     user = relationship("User", back_populates="almanacs")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'date', name='unique_user_date'),
+    )
