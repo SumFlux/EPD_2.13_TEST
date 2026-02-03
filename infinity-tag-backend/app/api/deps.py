@@ -1,65 +1,62 @@
-from typing import AsyncGenerator, Annotated
+from typing import AsyncGenerator, Optional
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from pydantic import ValidationError
 
-from app.core.database import AsyncSessionLocal
+from app.core import security
 from app.config import settings
+from app.core.database import AsyncSessionLocal
 from app.models.user import User
 
-# 定义 OAuth2 认证方案
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"/api/v1/auth/login")
+# 修改为 HTTPBearer，方便直接粘贴 Token
+security_scheme = HTTPBearer()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """
-    获取数据库会话 (依赖注入)
-    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
         finally:
             await session.close()
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: AsyncSession = Depends(get_db),
+    token: HTTPAuthorizationCredentials = Depends(security_scheme)
 ) -> User:
-    """
-    获取当前登录用户 (依赖注入)
-    验证 JWT Token 并查询数据库
-    """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="认证凭证无效或已过期",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
     try:
-        # 解码 JWT
+        # HTTPBearer 返回的是对象，credentials 属性才是 token 字符串
         payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM]
+            token.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+        token_data = payload.get("sub")
+        if token_data is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Could not validate credentials",
+            )
+    except (JWTError, ValidationError):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
 
-    # 查询数据库
-    # 注意: payload["sub"] 存的是 user_id (int)
-    stmt = select(User).where(User.id == int(user_id))
+    # Check if token_data is user_id (int) or device_id (str)
+    # Based on auth_service.py, we encoded user.id (int) into the subject
+    try:
+        user_id = int(token_data)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid token subject",
+        )
+
+    stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    user = result.scalars().first()
 
-    if user is None:
-        raise credentials_exception
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
     return user
