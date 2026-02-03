@@ -92,26 +92,12 @@ infinity-tag-backend/
 - ✅ **灵签速断** - 传统灵签抽取
 - ✅ **乾坤一掷** - 掷币决策
 
-## API 端点
+## 文档
 
-### 认证
-- `POST /api/v1/auth/activate` - 设备激活
-- `POST /api/v1/auth/login` - 设备登录
-- `POST /api/v1/auth/refresh` - 刷新 Token
-
-### 用户档案
-- `GET /api/v1/profile` - 获取档案
-- `POST /api/v1/profile` - 创建/更新档案
-- `GET /api/v1/profile/status` - 档案状态
-
-### 黄历
-- `POST /api/v1/almanac/generate` - 生成黄历
-- `GET /api/v1/almanac/history` - 历史记录
-- `GET /api/v1/almanac/cache` - 缓存数据
-
-### 解字
-- `GET /api/v1/word_bank/random` - 随机字库
-- `POST /api/v1/divination/interpret` - AI 解签
+- [环境配置详细教程](doc/教程/环境配置详细教程.md)
+- [API 接口调用规范](doc/教程/API接口调用规范.md)
+- [单片机通讯与开发指南](doc/教程/单片机通讯协议.md)
+- [系统运维与操作指南](doc/教程/运维操作指南.md)
 
 ## 安全特性
 

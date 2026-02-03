@@ -87,10 +87,10 @@ async def shutdown_event():
 
 
 # ====================================
-# 导入路由（稍后添加）
+# 导入路由
 # ====================================
-# from app.api.v1 import router as api_v1_router
-# app.include_router(api_v1_router, prefix="/api/v1")
+from app.api.v1.api import api_router
+app.include_router(api_router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

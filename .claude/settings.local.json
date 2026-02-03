@@ -22,5 +22,13 @@
         "repo": "affaan-m/everything-claude-code"
       }
     }
-  }
+  },
+  "disabledMcpServers": [
+    "supabase",
+    "railway",
+    "vercel",
+    "linear",
+    "neon",
+    "browserbase"
+  ]
 }
