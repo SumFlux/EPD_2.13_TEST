@@ -5,7 +5,7 @@ AI 服务模块
 import json
 import httpx
 import re
-from typing import Optional, Dict, Any
+from typing import Dict
 from loguru import logger
 from datetime import date
 

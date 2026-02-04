@@ -1,8 +1,6 @@
-from typing import List
 from PIL import Image
 from app.core.renderer_engine import RendererEngine
 from app.models.almanac import AlmanacHistory
-from datetime import date
 import io
 
 class RendererService:

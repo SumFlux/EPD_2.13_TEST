@@ -36,7 +36,15 @@
 |--------|------|------|
 | `JWT_SECRET_KEY` | JWT 签名密钥 | **务必修改为随机长字符串** |
 | `JWT_ALGORITHM` | 签名算法 | HS256 |
+| `DEVICE_CODE_SALT` | 设备码生成盐值 | **必填，使用随机字符串** |
+| `INIT_PWD_SALT` | 初始密码生成盐值 | **必填，使用随机字符串** |
+| `ADMIN_PASSWORD_HASH` | 管理员密码哈希 | **必填，bcrypt 格式** |
 | `AI_API_KEY` | AI 服务密钥 | sk-xxxxxx |
+
+> **生成管理员密码哈希**:
+> ```bash
+> python -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt']).hash('your-password'))"
+> ```
 
 ## 3. 部署流程
 

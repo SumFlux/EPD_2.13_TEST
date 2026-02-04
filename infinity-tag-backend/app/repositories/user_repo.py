@@ -8,6 +8,11 @@ class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def get_by_id(self, user_id: int) -> Optional[User]:
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_by_device_id(self, device_id: str) -> Optional[User]:
         stmt = select(User).where(User.device_id == device_id)
         result = await self.session.execute(stmt)

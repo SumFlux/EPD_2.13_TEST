@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 from datetime import date
 from app.api import deps
 from app.services.almanac_service import AlmanacService

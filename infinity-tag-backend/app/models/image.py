@@ -1,7 +1,6 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, String, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
-from datetime import datetime
 
 class CustomImage(BaseModel):
     """

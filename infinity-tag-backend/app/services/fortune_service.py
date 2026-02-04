@@ -6,7 +6,6 @@ import json
 import random
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from functools import lru_cache
 
 from app.utils.ten_gods import calculate_ten_god, extract_day_master, get_ten_god_nature
 

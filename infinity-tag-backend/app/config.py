@@ -4,6 +4,7 @@
 """
 from typing import List, Optional
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from functools import lru_cache
 import os
 
@@ -77,6 +78,19 @@ class Settings(BaseSettings):
     PASSWORD_MIN_LENGTH: int = 8
 
     # ====================================
+    # 设备码生成盐值配置
+    # ====================================
+    DEVICE_CODE_SALT: str  # 设备码生成盐（必须配置）
+    INIT_PWD_SALT: str     # 初始密码生成盐（必须配置）
+
+    # ====================================
+    # 管理员配置
+    # ====================================
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD_HASH: str  # 管理员密码哈希（必须配置）
+    ADMIN_JWT_EXPIRATION_HOURS: int = 24  # 管理员 token 24小时过期
+
+    # ====================================
     # 限流配置
     # ====================================
     RATE_LIMIT_PER_MINUTE: int = 60
@@ -106,6 +120,24 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    @model_validator(mode='after')
+    def validate_required_secrets(self) -> 'Settings':
+        """启动时校验必填的安全配置"""
+        missing = []
+        if not getattr(self, 'DEVICE_CODE_SALT', None):
+            missing.append('DEVICE_CODE_SALT')
+        if not getattr(self, 'INIT_PWD_SALT', None):
+            missing.append('INIT_PWD_SALT')
+        if not getattr(self, 'ADMIN_PASSWORD_HASH', None):
+            missing.append('ADMIN_PASSWORD_HASH')
+
+        if missing:
+            raise ValueError(
+                f"缺少必填的安全配置: {', '.join(missing)}。"
+                f"请在 .env 文件中配置这些值。"
+            )
+        return self
 
 
 @lru_cache()

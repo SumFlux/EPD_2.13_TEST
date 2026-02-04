@@ -4,7 +4,7 @@ import aiofiles
 from typing import List
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func
 from fastapi.concurrency import run_in_threadpool
 from app.models.image import CustomImage
 from app.models.user import User

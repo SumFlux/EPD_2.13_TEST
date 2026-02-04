@@ -6,7 +6,7 @@
 
 ## 技术栈
 
-- **框架**: Python 3.11+ / FastAPI
+- **框架**: Python 3.9+ / FastAPI
 - **数据库**: MySQL 8.0 + Redis
 - **AI 服务**: DMXAPI 中转站
 - **部署**: Docker + Nginx
@@ -95,8 +95,8 @@ infinity-tag-backend/
 
 ## 文档
 
-- [开发贡献指南 (CONTRIB)](docs/CONTRIB.md)
-- [运维操作手册 (RUNBOOK)](docs/RUNBOOK.md)
+- [开发贡献指南 (CONTRIB)](doc/CONTRIB.md)
+- [运维操作手册 (RUNBOOK)](doc/RUNBOOK.md)
 - [环境配置详细教程](doc/教程/环境配置详细教程.md)
 - [本地调试指南](doc/教程/本地调试指南.md)
 - [API 接口调用规范](doc/教程/API接口调用规范.md)
@@ -118,6 +118,9 @@ infinity-tag-backend/
 关键配置项：
 - `JWT_SECRET_KEY` - JWT 密钥（必须修改）
 - `MYSQL_PASSWORD` - 数据库密码
+- `DEVICE_CODE_SALT` - 设备码生成盐值（必填）
+- `INIT_PWD_SALT` - 初始密码生成盐值（必填）
+- `ADMIN_PASSWORD_HASH` - 管理员密码哈希（必填）
 - `AI_API_KEY` - AI 服务密钥（可动态修改）
 - `AI_MODEL_NAME` - AI 模型名称（可动态修改）
 

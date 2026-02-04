@@ -3,6 +3,7 @@
 """
 from app.models.base import Base, BaseModel
 from app.models.user import User, UserProfile
+from app.models.device import Device, DeviceStatus
 from app.models.almanac import AlmanacHistory
 from app.models.divination import DivinationRecord
 from app.models.image import CustomImage
@@ -14,6 +15,8 @@ __all__ = [
     "BaseModel",
     "User",
     "UserProfile",
+    "Device",
+    "DeviceStatus",
     "AlmanacHistory",
     "DivinationRecord",
     "CustomImage",

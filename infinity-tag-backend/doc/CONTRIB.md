@@ -107,7 +107,28 @@ python scripts/test_advanced_image_flow.py
 
 ### 运行单元测试
 ```bash
-pytest tests/ -v
+# 运行所有测试
+python -m pytest tests/ -v
+
+# 运行带覆盖率的测试
+python -m pytest tests/ -v --cov=app
+
+# 仅运行集成测试
+python -m pytest tests/ -m integration
+
+# 运行特定测试文件
+python -m pytest tests/integration/test_api/test_auth.py -v
+```
+
+### 测试目录结构
+```
+tests/
+├── conftest.py              # 共享 fixtures（数据库、客户端、测试数据）
+├── unit/                    # 单元测试
+├── integration/             # 集成测试
+│   └── test_api/
+│       └── test_auth.py     # 认证接口测试
+└── e2e/                     # 端到端测试
 ```
 
 ### 运行渲染引擎测试

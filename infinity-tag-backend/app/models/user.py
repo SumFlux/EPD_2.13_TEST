@@ -1,7 +1,6 @@
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
-from datetime import datetime
 
 class User(BaseModel):
     """
@@ -10,8 +9,9 @@ class User(BaseModel):
     __tablename__ = "users"
 
     device_id = Column(String(10), unique=True, index=True, nullable=False, comment='6位设备短码')
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True, comment='用户自定义密码哈希')
     device_secret = Column(String(64), nullable=False, comment='HMAC密钥')
+    password_set = Column(Boolean, default=False, nullable=False, comment='用户是否已设置自定义密码')
     activated_at = Column(DateTime, nullable=True)
     last_login_at = Column(DateTime, nullable=True)
 
@@ -20,6 +20,7 @@ class User(BaseModel):
     almanacs = relationship("AlmanacHistory", back_populates="user", cascade="all, delete-orphan")
     divination_records = relationship("DivinationRecord", back_populates="user", cascade="all, delete-orphan")
     images = relationship("CustomImage", back_populates="user", cascade="all, delete-orphan")
+    device = relationship("Device", back_populates="user", uselist=False)
 
 class UserProfile(BaseModel):
     """

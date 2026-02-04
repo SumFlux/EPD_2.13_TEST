@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, profile, almanac, divination, renderer, images
+from app.api.v1.endpoints import auth, profile, almanac, divination, renderer, images, admin, device
 
 api_router = APIRouter()
 
@@ -9,3 +9,5 @@ api_router.include_router(almanac.router, prefix="/almanac", tags=["Almanac"])
 api_router.include_router(divination.router, prefix="/divination", tags=["Divination"])
 api_router.include_router(renderer.router, prefix="/renderer", tags=["Renderer"])
 api_router.include_router(images.router, prefix="/images", tags=["Images"])
+api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
+api_router.include_router(device.router, prefix="/device", tags=["Device"])

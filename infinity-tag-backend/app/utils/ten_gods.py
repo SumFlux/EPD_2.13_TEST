@@ -14,7 +14,7 @@
 - 正印(ZHENG_YIN): 生我异阴阳
 - 偏印(PIAN_YIN): 生我同阴阳
 """
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
 
 # 天干
 TIAN_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]

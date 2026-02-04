@@ -1,14 +1,12 @@
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Response
 from fastapi.concurrency import run_in_threadpool
-from pydantic import Json
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from app.models.user import User
 from app.schemas.image import ImageOut, ImageReorder, ImageProcessOptions
 from app.services.image_service import ImageService
 from app.services.image_processing import ImageProcessor
-from app.config import settings
 import os
 
 router = APIRouter()

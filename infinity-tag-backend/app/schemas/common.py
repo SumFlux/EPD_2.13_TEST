@@ -1,7 +1,7 @@
 """
 通用 Schema 定义
 """
-from typing import Generic, TypeVar, Optional, Any
+from typing import Generic, TypeVar, Optional
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")

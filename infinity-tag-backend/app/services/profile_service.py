@@ -1,5 +1,4 @@
-from typing import Optional, Dict, Any, List
-from datetime import datetime
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import UserProfile

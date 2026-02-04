@@ -1,18 +1,20 @@
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import ValidationError
 
-from app.core import security
 from app.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.user import User
 
 # 修改为 HTTPBearer，方便直接粘贴 Token
 security_scheme = HTTPBearer()
+
+# OAuth2 scheme for admin endpoints
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/admin/login", auto_error=True)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
@@ -60,3 +62,35 @@ async def get_current_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     return user
+
+
+async def get_temp_token_user_id(
+    token: str = Depends(oauth2_scheme)
+) -> int:
+    """
+    解析临时 token，返回用户 ID
+    仅用于设置密码接口
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        subject = payload.get("sub")
+        if not subject or not subject.startswith("temp:"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="无效的临时token"
+            )
+        return int(subject.split(":")[1])
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="临时token已过期或无效"
+        )
+    except (ValueError, IndexError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的token格式"
+        )

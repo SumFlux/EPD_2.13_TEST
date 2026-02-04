@@ -1,9 +1,8 @@
-from typing import List, Optional
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.divination import DivinationRecord
 from app.core.ai_service import ai_service
 from app.core.prompt_sanitizer import PromptSanitizer
-import json
 
 class DivinationService:
     """解字服务"""

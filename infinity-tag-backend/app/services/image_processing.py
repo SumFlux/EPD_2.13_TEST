@@ -1,7 +1,5 @@
-import os
 import io
-from PIL import Image, ImageOps, ImageEnhance
-from app.config import settings
+from PIL import Image, ImageOps
 from app.schemas.image import ImageProcessOptions
 
 class ImageProcessor:
