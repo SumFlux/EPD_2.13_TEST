@@ -139,3 +139,58 @@ docker logs infinity-tag-app | grep "renderer"
 **解决**:
 - 检查数据库连接是否正常。
 - 检查 `logs/` 目录下的详细堆栈信息。
+
+### Q4: 黄历生成返回默认批注
+**原因**: AI 服务调用失败，使用了降级方案。
+**解决**:
+- 检查 `.env` 中 `AI_API_KEY` 是否有效。
+- 检查 `AI_BASE_URL` 是否可访问。
+- 查看日志中的 `Failed to parse AI fortune response` 错误。
+
+### Q5: 十神计算结果异常
+**原因**: 用户档案中的八字日柱格式错误。
+**解决**:
+- 确认 `profile.bazi_day` 格式为 "甲子" (天干+地支)。
+- 检查 `app/utils/ten_gods.py` 中的 `TIAN_GAN` 常量。
+
+### Q6: 字库 API 返回空列表
+**原因**: `word_bank.json` 文件缺失或格式错误。
+**解决**:
+- 确认 `app/data/word_bank.json` 存在。
+- 检查 JSON 格式是否正确 (可用 `python -m json.tool` 验证)。
+
+## 7. 命理模块监控
+
+### 关键指标
+
+| 指标 | 正常范围 | 告警阈值 |
+|------|---------|---------|
+| AI 调用成功率 | > 95% | < 90% |
+| 黄历生成延迟 | < 2s | > 5s |
+| 十神计算延迟 | < 10ms | > 100ms |
+
+### 日志关键词
+
+```bash
+# 监控 AI 服务失败
+grep "Failed to parse AI" logs/app.log
+
+# 监控十神计算异常
+grep "无效天干" logs/app.log
+
+# 监控字库加载
+grep "word_bank" logs/app.log
+```
+
+### 数据文件检查
+
+```bash
+# 验证 fortune_rules.json 格式
+python -m json.tool app/data/fortune_rules.json > /dev/null && echo "OK"
+
+# 验证 word_bank.json 格式
+python -m json.tool app/data/word_bank.json > /dev/null && echo "OK"
+
+# 统计字库字数
+python -c "import json; d=json.load(open('app/data/word_bank.json')); print(f'总字数: {len(d.get(\"all_words\", []))}')"
+```

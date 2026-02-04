@@ -117,6 +117,60 @@ python scripts/test_renderer.py
 ```
 *检查生成的 `test_render_preview.png` 确认字体和布局正常。*
 
+## 🔮 命理计算模块指南 (New)
+
+本项目包含完整的八字命理计算功能，用于生成个性化黄历和运势。
+
+### 核心组件
+
+| 模块 | 文件 | 功能 |
+|------|------|------|
+| 十神引擎 | `app/utils/ten_gods.py` | 计算日主与天干的十神关系 |
+| 运势服务 | `app/services/fortune_service.py` | 基于十神生成个性化宜忌 |
+| 字库服务 | `app/services/word_bank_service.py` | 解字测算的字库管理 |
+| AI 服务 | `app/core/ai_service.py` | 天机批注和解签生成 |
+
+### 十神计算示例
+
+```python
+from app.utils.ten_gods import calculate_ten_god, get_ten_god_nature
+
+# 计算日主甲木遇丙火的十神关系
+ten_god = calculate_ten_god("甲", "丙")  # 返回 "食神"
+
+# 获取十神性质
+nature = get_ten_god_nature("食神")
+# {'element': '我生', 'nature': '泄秀', 'favorable_energy': '吉', ...}
+```
+
+### 运势生成 API 流程
+
+1. **计算十神**: 根据用户日柱与当日天干计算十神关系
+2. **规则匹配**: 从 `fortune_rules.json` 获取十神对应的宜忌活动
+3. **职业加成**: 根据用户职业叠加专属建议
+4. **关注排序**: 按用户关注领域优先级排序
+5. **AI 增强** (可选): 调用 AI 生成个性化批注
+
+### 数据文件说明
+
+| 文件 | 用途 | 格式 |
+|------|------|------|
+| `app/data/fortune_rules.json` | 十神宜忌规则、职业映射、吉祥物等 | JSON |
+| `app/data/word_bank.json` | 解字字库，按类别分组 (天象/地理/人事等) | JSON |
+
+### 扩展字库
+
+编辑 `app/data/word_bank.json` 添加新字：
+
+```json
+{
+  "categories": {
+    "新类别": ["字1", "字2", "字3"]
+  },
+  "all_words": ["...", "字1", "字2", "字3"]
+}
+```
+
 ## 🎨 代码风格
 
 - **格式化**: `black app/ scripts/ tests/`
@@ -129,13 +183,25 @@ python scripts/test_renderer.py
 app/
 ├── api/
 │   └── v1/endpoints/
+│       ├── almanac.py        # 黄历生成接口
+│       ├── divination.py     # 解字测算接口 (字库 API)
 │       ├── images.py         # [核心] 图片上传与处理接口
 │       └── renderer.py       # 文字渲染相关接口
 ├── core/
+│   ├── ai_service.py         # AI 服务封装 (运势生成/解签)
 │   └── renderer_engine.py    # 墨水屏渲染核心引擎
+├── data/
+│   ├── fortune_rules.json    # [新增] 十神宜忌规则库
+│   └── word_bank.json        # [新增] 解字字库数据
 ├── services/
+│   ├── almanac_service.py    # 黄历业务逻辑
+│   ├── fortune_service.py    # [新增] 运势生成服务
+│   ├── word_bank_service.py  # [新增] 字库加载服务
 │   ├── image_service.py      # 图片数据库业务逻辑
 │   └── image_processing.py   # [核心] Pillow 图片处理算法 (抖动/裁剪等)
+├── utils/
+│   ├── lunar.py              # 农历/八字计算工具
+│   └── ten_gods.py           # [新增] 十神关系计算引擎
 assets/
 └── fonts/                    # 字体文件存放目录
 ```

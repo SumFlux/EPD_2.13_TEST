@@ -6,7 +6,7 @@ from app.models.almanac import AlmanacHistory
 from app.models.user import UserProfile
 from app.utils.lunar import LunarUtils
 from app.core.ai_service import ai_service
-import random
+from app.services.fortune_service import generate_personalized_fortune
 
 class AlmanacService:
     """黄历服务"""
@@ -64,15 +64,19 @@ class AlmanacService:
         # 获取当日干支 (需要准确的日柱)
         bazi_today = LunarUtils.get_ba_zi(target_date.year, target_date.month, target_date.day)
 
-        # 3. 生成基础运势 (Mock 算法，后续可接入真实运势库)
-        favorable_pool = ["祭祀", "祈福", "求嗣", "开光", "出行", "解除", "伐木", "拆卸", "修造", "安床"]
-        unfavorable_pool = ["嫁娶", "移徙", "入宅", "开市", "交易", "安门", "安葬"]
+        # 3. 基于十神关系生成个性化运势
+        fortune = generate_personalized_fortune(
+            user_bazi_day=profile.bazi_day or "甲子",
+            today_gan=bazi_today['day'],
+            profession=profile.profession,
+            focus_areas=profile.focus_areas
+        )
 
-        favorable = random.sample(favorable_pool, k=3)
-        unfavorable = random.sample(unfavorable_pool, k=3)
-
-        lucky_items = ["红绳", "水晶", "桃木", "铜钱", "葫芦"]
-        lucky_directions = ["正东", "正西", "正南", "正北", "东南", "东北", "西南", "西北"]
+        favorable = fortune['favorable']
+        unfavorable = fortune['unfavorable']
+        lucky_direction = fortune['lucky_direction']
+        lucky_item = fortune['lucky_item']
+        energy_level = fortune['energy_level']
 
         # 4. 调用 AI 生成批注
         user_bazi = {
@@ -102,9 +106,9 @@ class AlmanacService:
             ganzhi_day=bazi_today['day'],
             favorable=favorable,
             unfavorable=unfavorable,
-            lucky_direction=random.choice(lucky_directions),
-            lucky_item=random.choice(lucky_items),
-            energy_level=random.randint(60, 95),
+            lucky_direction=lucky_direction,
+            lucky_item=lucky_item,
+            energy_level=energy_level,
             commentary=commentary,
             generated_at=datetime.now()
         )

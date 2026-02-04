@@ -1,6 +1,7 @@
 import httpx
 import json
 import logging
+import re
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -132,6 +133,106 @@ class AIService:
 请生成今日天机批注。
 """
         return await self.chat_completion(system_prompt, user_message, 0.9, db)
+
+    async def generate_fortune_content(
+        self,
+        ten_god: str,
+        ten_god_nature: Dict[str, Any],
+        user_bazi: Dict[str, str],
+        ganzhi_day: str,
+        profession: Optional[str],
+        focus_areas: Optional[List[str]],
+        lunar_date: str,
+        db: Optional[AsyncSession] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        一次 API 调用生成完整运势内容
+
+        :param ten_god: 十神关系 (如 "食神")
+        :param ten_god_nature: 十神性质 (含 favorable_energy, keywords 等)
+        :param user_bazi: 用户八字 {year, month, day, hour}
+        :param ganzhi_day: 当日干支
+        :param profession: 职业 (自由文本)
+        :param focus_areas: 关注领域列表
+        :param lunar_date: 农历日期
+        :param db: 数据库会话
+        :return: 包含完整运势的字典，AI 调用失败时返回 None
+
+        注意: 调用方需检查返回值是否为 None，若为 None 应使用降级方案
+        (如 FortuneService.generate_fortune() 的规则引擎结果)
+        """
+        prof_str = profession if profession else "普通上班族"
+        focus_str = "、".join(focus_areas) if focus_areas else "综合运势"
+        energy_type = ten_god_nature.get("favorable_energy", "中性")
+        keywords = "、".join(ten_god_nature.get("keywords", []))
+
+        system_prompt = f"""你是一位精通命理学的天机大师。
+请根据用户的八字十神关系、职业特点和关注领域，生成今日个性化运势。
+
+当前信息：
+- 十神关系: {ten_god} (能量属性: {energy_type})
+- 十神关键词: {keywords}
+- 用户职业: {prof_str}
+- 关注领域: {focus_str}
+- 农历日期: {lunar_date}
+- 当日干支: {ganzhi_day}
+- 用户日主: {user_bazi.get('day', '未知')}
+
+请严格按以下 JSON 格式输出（不要包含 markdown 代码块标记）：
+{{
+  "favorable": ["宜做事项1", "宜做事项2", "宜做事项3"],
+  "unfavorable": ["忌做事项1", "忌做事项2", "忌做事项3"],
+  "lucky_item": "今日吉祥物及简短理由",
+  "lucky_color": "今日幸运色及搭配建议",
+  "lucky_direction": "吉利方位(如正东、西南等)",
+  "daily_tip": "一条具体可执行的今日建议",
+  "energy_level": 75,
+  "commentary": "20-40字的天机批注，半文半白风格"
+}}
+
+要求：
+1. 宜忌要结合职业特点定制措辞（如程序员用"适合Code Review"而非"适合审阅"）
+2. 吉祥物要有创意，避免千篇一律，给出简短理由
+3. 幸运颜色要给出具体搭配建议
+4. 每日贴士要具体可执行，不要空泛
+5. 能量等级根据十神吉凶：吉=75-95，中性=65-85，偏凶=55-75
+6. 批注需半文半白，富有禅意，点到为止"""
+
+        user_message = f"请为今日（{lunar_date}）生成个性化运势。"
+
+        try:
+            response = await self.chat_completion(system_prompt, user_message, 0.85, db)
+
+            # 清理 markdown 标记
+            clean_response = response.strip()
+            clean_response = re.sub(r'^```json\s*', '', clean_response)
+            clean_response = re.sub(r'\s*```$', '', clean_response)
+            clean_response = clean_response.strip()
+
+            result = json.loads(clean_response)
+
+            # 验证必要字段
+            required_fields = ["favorable", "unfavorable", "lucky_item", "lucky_color",
+                             "lucky_direction", "daily_tip", "energy_level", "commentary"]
+            for field in required_fields:
+                if field not in result:
+                    raise ValueError(f"Missing required field: {field}")
+
+            # 确保 favorable 和 unfavorable 是列表
+            if not isinstance(result["favorable"], list):
+                result["favorable"] = [result["favorable"]]
+            if not isinstance(result["unfavorable"], list):
+                result["unfavorable"] = [result["unfavorable"]]
+
+            # 确保 energy_level 在合理范围内
+            result["energy_level"] = max(55, min(95, int(result["energy_level"])))
+
+            return result
+
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            logger.error(f"Failed to parse AI fortune response: {e}")
+            # 返回 None 表示需要使用降级方案
+            return None
 
     async def interpret_divination(
         self,
