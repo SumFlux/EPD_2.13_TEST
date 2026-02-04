@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores'
-import apiClient from '@/api/client'
-import type { SetPasswordResponse } from '@/types/admin'
+import { authApi } from '@/api/auth'
 
 export default function SetPasswordPage() {
   const navigate = useNavigate()
-  const { setAuth } = useAuthStore()
+  const { isAuthenticated, setAuthFromSetPassword } = useAuthStore()
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -17,27 +16,47 @@ export default function SetPasswordPage() {
   useEffect(() => {
     // 检查是否有临时token
     const tempToken = localStorage.getItem('temp_token')
+    const tokenExpires = localStorage.getItem('temp_token_expires')
     const pendingDeviceCode = localStorage.getItem('pending_device_code')
 
-    if (!tempToken || !pendingDeviceCode) {
+    // 检查 token 是否过期
+    if (tokenExpires && Date.now() > Number(tokenExpires)) {
+      localStorage.removeItem('temp_token')
+      localStorage.removeItem('temp_token_expires')
+      localStorage.removeItem('pending_device_code')
       navigate('/setup')
       return
     }
 
-    setDeviceCode(pendingDeviceCode)
+    if (!tempToken) {
+      // 没有临时token，跳回激活页
+      navigate('/setup')
+      return
+    }
+
+    if (pendingDeviceCode) {
+      setDeviceCode(pendingDeviceCode)
+    }
   }, [navigate])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/')
+    }
+  }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (password !== confirmPassword) {
-      setError('两次输入的密码不一致')
+    // 验证密码
+    if (password.length < 6) {
+      setError('密码至少需要6位')
       return
     }
 
-    if (password.length < 6) {
-      setError('密码长度至少为6位')
+    if (password !== confirmPassword) {
+      setError('两次输入的密码不一致')
       return
     }
 
@@ -45,29 +64,23 @@ export default function SetPasswordPage() {
 
     try {
       const tempToken = localStorage.getItem('temp_token')
+      if (!tempToken) {
+        setError('会话已过期，请重新激活')
+        navigate('/setup')
+        return
+      }
 
-      const response = await apiClient.post<SetPasswordResponse>(
-        '/auth/set-password',
-        { new_password: password },
-        {
-          headers: {
-            Authorization: `Bearer ${tempToken}`
-          }
-        }
-      )
+      const response = await authApi.setPassword({ new_password: password }, tempToken)
 
-      // 清除临时数据
+      // 清理临时数据
       localStorage.removeItem('temp_token')
+      localStorage.removeItem('temp_token_expires')
       localStorage.removeItem('pending_device_code')
 
-      // 设置认证状态
-      setAuth({
-        access_token: response.data.access_token,
-        token_type: 'bearer',
-        device_id: response.data.device_id,
-        user_id: 0
-      })
+      // 保存认证信息
+      setAuthFromSetPassword(response)
 
+      // 跳转到主页
       navigate('/')
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { detail?: string } } }
@@ -81,48 +94,45 @@ export default function SetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="card w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-accent-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-gradient mb-2">激活成功！</h1>
-          <p className="text-text-secondary">请设置您的登录密码</p>
-        </div>
-
-        <div className="bg-background-secondary rounded-lg p-4 mb-6">
-          <p className="text-sm text-text-secondary">
-            设备码：<span className="font-mono font-bold text-text-primary">{deviceCode}</span>
+          <h1 className="text-2xl font-bold text-gradient mb-2">设置密码</h1>
+          <p className="text-text-secondary">
+            设备 <span className="font-mono font-bold">{deviceCode}</span> 激活成功
+          </p>
+          <p className="text-text-secondary text-sm mt-1">
+            请设置您的登录密码
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-text-secondary mb-1">
-              设置密码
+            <label htmlFor="new-password" className="block text-sm text-text-secondary mb-1">
+              新密码
             </label>
             <input
+              id="new-password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input"
-              placeholder="至少6位字符"
-              minLength={6}
+              placeholder="至少6位"
               required
+              minLength={6}
             />
           </div>
 
           <div>
-            <label className="block text-sm text-text-secondary mb-1">
+            <label htmlFor="confirm-password" className="block text-sm text-text-secondary mb-1">
               确认密码
             </label>
             <input
+              id="confirm-password"
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="input"
               placeholder="再次输入密码"
-              minLength={6}
               required
             />
           </div>
@@ -140,8 +150,8 @@ export default function SetPasswordPage() {
           </button>
         </form>
 
-        <p className="text-xs text-text-secondary text-center mt-6">
-          设置完成后，使用设备码和此密码登录
+        <p className="text-xs text-text-secondary text-center mt-4">
+          此密码用于日后登录，请妥善保管
         </p>
       </div>
     </div>

@@ -14,7 +14,22 @@ export const apiClient = axios.create({
 // 请求拦截器 - 添加 token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('access_token')
+    // 优先使用用户 token，如果没有则尝试使用管理员 token
+    let token = localStorage.getItem('access_token')
+
+    // 如果是 admin 接口，尝试从 adminStore 获取 token
+    if (!token && config.url?.startsWith('/admin')) {
+      const adminStoreData = localStorage.getItem('infinity-tag-admin')
+      if (adminStoreData) {
+        try {
+          const parsed = JSON.parse(adminStoreData)
+          token = parsed.state?.adminToken
+        } catch {
+          // 解析失败，忽略
+        }
+      }
+    }
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -30,10 +45,20 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // token 过期，清除并跳转登录
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('device_id')
-      window.location.href = ROUTES.SETUP
+      const requestUrl = error.config?.url || ''
+
+      // 根据请求路径决定跳转目标
+      if (requestUrl.startsWith('/admin')) {
+        // 管理员接口 401，清除管理员状态并跳转
+        localStorage.removeItem('infinity-tag-admin')
+        window.location.href = ROUTES.ADMIN_LOGIN
+      } else {
+        // 用户接口 401，清除所有用户状态并跳转
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('device_id')
+        localStorage.removeItem('infinity-tag-auth')  // 清除 Zustand persist 状态
+        window.location.href = ROUTES.SETUP
+      }
     }
     return Promise.reject(error)
   }
@@ -45,14 +70,11 @@ export function createFormData(
   options?: Record<string, unknown>
 ): FormData {
   const formData = new FormData()
-  formData.append('image', file)
+  formData.append('file', file)  // 后端期望字段名为 'file'
 
-  if (options) {
-    Object.entries(options).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, String(value))
-      }
-    })
+  // 后端期望 options 是一个 JSON 字符串
+  if (options && Object.keys(options).length > 0) {
+    formData.append('options', JSON.stringify(options))
   }
 
   return formData

@@ -11,22 +11,40 @@ export interface ApiResponse<T> {
 }
 
 // ---------- 认证相关 ----------
+// 第一步：设备激活请求
 export interface ActivateRequest {
-  device_id?: string
-  password: string
+  device_code: string    // 6位设备码
+  init_password: string  // 6位初始密码
+}
+
+// 第一步：激活响应（需要设置密码）
+export interface ActivateResponse {
+  success: boolean
+  requires_password_setup: boolean
+  temp_token: string     // 临时token，仅用于设置密码
+  device_code: string
+}
+
+// 第二步：设置密码请求
+export interface SetPasswordRequest {
+  new_password: string   // 用户自定义密码（至少6位）
+}
+
+// 第二步：设置密码响应
+export interface SetPasswordResponse {
+  access_token: string
+  token_type: 'bearer'
+  device_id: string
 }
 
 export interface LoginRequest {
-  device_id: string
-  password: string
+  device_code: string    // 设备码
+  password: string       // 用户密码
 }
 
-export interface AuthResponse {
+export interface LoginResponse {
   access_token: string
   token_type: 'bearer'
-  device_secret?: string // 仅激活时返回
-  user_id: number
-  device_id: string
 }
 
 export interface UserInfo {
@@ -53,6 +71,11 @@ export interface ProfileRequest {
 export interface Profile extends ProfileRequest {
   id: number
   user_id: number
+  // 后端计算的八字
+  bazi_year?: string
+  bazi_month?: string
+  bazi_day?: string
+  bazi_hour?: string
   created_at: string
   updated_at?: string
 }
@@ -127,10 +150,8 @@ export interface DivinationWordsRequest {
   category?: string
 }
 
-export interface DivinationCategory {
-  name: string
-  description?: string
-}
+// 后端返回的是字符串数组，不是对象数组
+export type DivinationCategories = string[]
 
 export interface DivinationInterpretRequest {
   mode: DivinationMode

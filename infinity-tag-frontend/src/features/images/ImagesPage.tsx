@@ -1,14 +1,15 @@
 import { useEffect, useState, useRef } from 'react'
 import { useImagesStore } from '@/stores'
 import { imagesApi } from '@/api'
-import type { ImageItem, ImageOptions } from '@/types'
+import type { ImageOptions } from '@/types'
 
 const MAX_IMAGES = 5
 
 export default function ImagesPage() {
-  const { images, setImages, addImage, removeImage, isLoading, setLoading, error, setError } = useImagesStore()
+  const { images, setImages, addImage, removeImage, reorderImages, isLoading, setLoading, error, setError } = useImagesStore()
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isReordering, setIsReordering] = useState(false)
   const [options, setOptions] = useState<ImageOptions>({
     rotate: 0,
     invert: false,
@@ -107,23 +108,47 @@ export default function ImagesPage() {
     }
   }
 
+  // 通用移动函数：direction 为 -1 表示上移，1 表示下移
+  const handleMove = async (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= images.length) return
+
+    setIsReordering(true)
+    const newOrder = [...images]
+    const temp = newOrder[index]
+    newOrder[index] = newOrder[targetIndex]
+    newOrder[targetIndex] = temp
+    const imageIds = newOrder.map(img => img.id)
+
+    try {
+      await imagesApi.reorder(imageIds)
+      reorderImages(imageIds)
+    } catch {
+      setError('排序失败')
+    } finally {
+      setIsReordering(false)
+    }
+  }
+
   const handleOptionChange = <K extends keyof ImageOptions>(key: K, value: ImageOptions[K]) => {
     setOptions((prev) => ({ ...prev, [key]: value }))
   }
 
   return (
-    <div className="min-h-screen p-4">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-center mb-6">图片管理</h1>
-
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-lg mx-auto p-4">
         {error && (
           <div className="card mb-4 text-accent-secondary text-center">{error}</div>
         )}
 
         {/* 上传区域 */}
-        <div className="card mb-6">
-          <div className="mb-4">
-            <label className="block text-sm text-text-secondary mb-2">选择图片</label>
+        <div className="card mb-4">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="font-bold">上传图片</h2>
+            <span className="text-sm text-text-secondary">{images.length}/{MAX_IMAGES}</span>
+          </div>
+
+          <div className="mb-3">
             <input
               ref={fileInputRef}
               type="file"
@@ -142,17 +167,17 @@ export default function ImagesPage() {
             <>
               {/* 预览 */}
               {previewUrl && (
-                <div className="mb-4 flex justify-center">
+                <div className="mb-3 flex justify-center">
                   <img
                     src={previewUrl}
                     alt="预览"
-                    className="max-w-full max-h-64 border border-border rounded"
+                    className="max-w-full border border-border rounded"
                   />
                 </div>
               )}
 
               {/* 处理选项 */}
-              <div className="space-y-4 mb-4">
+              <div className="space-y-3 mb-3">
                 {/* 旋转 */}
                 <div>
                   <label className="block text-sm text-text-secondary mb-1">旋转</label>
@@ -224,50 +249,64 @@ export default function ImagesPage() {
           )}
         </div>
 
-        {/* 图片列表 */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold">已上传图片</h2>
-            <span className="text-sm text-text-secondary">{images.length}/{MAX_IMAGES}</span>
+        {/* 图片列表 - 单列原比例显示 */}
+        {images.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="font-bold">已上传图片</h2>
+            {images.map((image, index) => (
+              <div key={image.id} className="card p-3">
+                {/* 原比例图片 */}
+                <img
+                  src={image.url}
+                  alt={`图片 ${index + 1}`}
+                  className="w-full rounded mb-3"
+                />
+
+                {/* 操作按钮 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    {/* 上移 */}
+                    <button
+                      onClick={() => handleMove(index, -1)}
+                      disabled={index === 0 || isReordering}
+                      className="px-3 py-1 rounded text-sm bg-background-secondary disabled:opacity-30 hover:bg-background-secondary/80 transition-colors"
+                      title="上移"
+                    >
+                      ↑ 上移
+                    </button>
+                    {/* 下移 */}
+                    <button
+                      onClick={() => handleMove(index, 1)}
+                      disabled={index === images.length - 1 || isReordering}
+                      className="px-3 py-1 rounded text-sm bg-background-secondary disabled:opacity-30 hover:bg-background-secondary/80 transition-colors"
+                      title="下移"
+                    >
+                      ↓ 下移
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-text-secondary">
+                      #{index + 1} · 查看 {image.view_count}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(image.id)}
+                      className="px-3 py-1 rounded text-sm bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30 transition-colors"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
+        )}
 
-          {images.length === 0 ? (
-            <div className="card text-center text-text-secondary">暂无图片</div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {images.map((image) => (
-                <ImageCard key={image.id} image={image} onDelete={handleDelete} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ImageCard({
-  image,
-  onDelete,
-}: {
-  image: ImageItem
-  onDelete: (id: number) => void
-}) {
-  return (
-    <div className="card p-2">
-      <img
-        src={image.url}
-        alt={`图片 ${image.id}`}
-        className="w-full aspect-square object-cover rounded mb-2"
-      />
-      <div className="flex justify-between items-center text-sm">
-        <span className="text-text-secondary">查看: {image.view_count}</span>
-        <button
-          onClick={() => onDelete(image.id)}
-          className="text-accent-secondary hover:text-accent-secondary/80 transition-colors"
-        >
-          删除
-        </button>
+        {images.length === 0 && !selectedFile && (
+          <div className="card text-center text-text-secondary">
+            暂无图片，点击上方按钮上传
+          </div>
+        )}
       </div>
     </div>
   )

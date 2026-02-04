@@ -2,6 +2,16 @@
 // 管理员相关类型定义
 // ============================================
 
+// 从 api.ts 导入共享的认证类型，避免重复定义
+export type {
+  ActivateRequest,
+  ActivateResponse,
+  SetPasswordRequest,
+  SetPasswordResponse,
+  LoginRequest,
+  LoginResponse,
+} from './api'
+
 // ---------- 管理员认证 ----------
 export interface AdminLoginRequest {
   username: string
@@ -91,37 +101,4 @@ export interface AdminStats {
   disabled_devices: number
   total_users: number
   users_with_password: number
-}
-
-// ---------- 新认证流程 ----------
-export interface DeviceActivateRequest {
-  device_code: string
-  init_password: string
-}
-
-export interface ActivateResponse {
-  success: boolean
-  requires_password_setup: boolean
-  temp_token: string
-  device_code: string
-}
-
-export interface SetPasswordRequest {
-  new_password: string
-}
-
-export interface SetPasswordResponse {
-  access_token: string
-  token_type: 'bearer'
-  device_id: string
-}
-
-export interface NewLoginRequest {
-  device_code: string
-  password: string
-}
-
-export interface NewLoginResponse {
-  access_token: string
-  token_type: 'bearer'
 }

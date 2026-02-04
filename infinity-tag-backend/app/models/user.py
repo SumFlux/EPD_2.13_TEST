@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON, Boolean, Text
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
@@ -30,17 +30,26 @@ class UserProfile(BaseModel):
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
 
-    birth_datetime = Column(DateTime, nullable=False)
-    birth_place = Column(String(100), nullable=True)
+    # 基本信息
+    nickname = Column(String(50), nullable=False, comment='昵称')
+    gender = Column(Integer, nullable=False, default=1, comment='性别: 0女 1男')
 
-    # 八字四柱
+    # 出生信息 (分开存储，支持农历)
+    birth_year = Column(Integer, nullable=False)
+    birth_month = Column(Integer, nullable=False)
+    birth_day = Column(Integer, nullable=False)
+    birth_hour = Column(Integer, nullable=False, default=-1, comment='时辰: -1未知, 0-23')
+    is_lunar = Column(Boolean, nullable=False, default=False, comment='是否农历')
+
+    # 八字四柱 (后端计算)
     bazi_year = Column(String(10), nullable=False)
     bazi_month = Column(String(10), nullable=False)
     bazi_day = Column(String(10), nullable=False)
     bazi_hour = Column(String(10), nullable=False)
 
-    profession = Column(String(50), nullable=True)
-    focus_areas = Column(JSON, nullable=True, comment='["事业", "财运"]')
+    # 其他信息
+    occupation = Column(String(50), nullable=True, comment='职业')
+    notes = Column(Text, nullable=True, comment='备注/关注点')
 
     # 关联
     user = relationship("User", back_populates="profile")

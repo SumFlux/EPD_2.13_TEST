@@ -14,10 +14,10 @@ export const almanacApi = {
    * 获取历史黄历
    */
   history: async (days: number = 30): Promise<Almanac[]> => {
-    const response = await apiClient.get<Almanac[]>('/almanac/history', {
+    const response = await apiClient.get<{ data: Almanac[]; total: number }>('/almanac/history', {
       params: { days },
     })
-    return response.data
+    return response.data.data  // 后端返回 { data: [...], total: n }
   },
 }
 

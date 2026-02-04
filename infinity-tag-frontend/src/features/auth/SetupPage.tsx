@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores'
-import apiClient from '@/api/client'
-import type { ActivateResponse, NewLoginResponse } from '@/types/admin'
+import { authApi } from '@/api/auth'
+import type { ActivateResponse, LoginResponse } from '@/types'
 
 export default function SetupPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { isAuthenticated, setAuth } = useAuthStore()
+  const { isAuthenticated, setAuthFromLogin } = useAuthStore()
 
   const [mode, setMode] = useState<'activate' | 'login'>('activate')
   const [deviceCode, setDeviceCode] = useState('')
@@ -44,22 +44,26 @@ export default function SetupPage() {
     }
   }, [isAuthenticated, navigate])
 
+  const handleActivateSuccess = (response: ActivateResponse) => {
+    if (response.requires_password_setup) {
+      // 存储临时token，跳转到设置密码页
+      localStorage.setItem('temp_token', response.temp_token)
+      localStorage.setItem('temp_token_expires', String(Date.now() + 10 * 60 * 1000)) // 10分钟过期
+      localStorage.setItem('pending_device_code', response.device_code)
+      navigate('/setup/password')
+    }
+  }
+
   const handleAutoActivate = async (code: string, pwd: string) => {
     setLoading(true)
     setError('')
 
     try {
-      const response = await apiClient.post<ActivateResponse>('/auth/activate', {
+      const response = await authApi.activate({
         device_code: code,
         init_password: pwd
       })
-
-      if (response.data.requires_password_setup) {
-        // 存储临时token，跳转到设置密码页
-        localStorage.setItem('temp_token', response.data.temp_token)
-        localStorage.setItem('pending_device_code', response.data.device_code)
-        navigate('/setup/password')
-      }
+      handleActivateSuccess(response)
     } catch {
       // 如果激活失败，可能是已激活，切换到登录模式
       setMode('login')
@@ -75,16 +79,11 @@ export default function SetupPage() {
     setLoading(true)
 
     try {
-      const response = await apiClient.post<ActivateResponse>('/auth/activate', {
+      const response = await authApi.activate({
         device_code: deviceCode,
         init_password: initPassword
       })
-
-      if (response.data.requires_password_setup) {
-        localStorage.setItem('temp_token', response.data.temp_token)
-        localStorage.setItem('pending_device_code', response.data.device_code)
-        navigate('/setup/password')
-      }
+      handleActivateSuccess(response)
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { detail?: string } } }
       setError(axiosError.response?.data?.detail || '激活失败，请检查设备码和初始密码')
@@ -99,17 +98,12 @@ export default function SetupPage() {
     setLoading(true)
 
     try {
-      const response = await apiClient.post<NewLoginResponse>('/auth/login', {
+      const response: LoginResponse = await authApi.login({
         device_code: deviceCode,
         password: userPassword
       })
 
-      setAuth({
-        access_token: response.data.access_token,
-        token_type: 'bearer',
-        device_id: deviceCode,
-        user_id: 0
-      })
+      setAuthFromLogin(response)
       navigate('/')
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { detail?: string } } }

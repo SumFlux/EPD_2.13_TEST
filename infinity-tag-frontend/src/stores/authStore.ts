@@ -1,16 +1,16 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AuthResponse, UserInfo } from '@/types'
+import type { SetPasswordResponse, LoginResponse, UserInfo } from '@/types'
 
 interface AuthState {
   token: string | null
   deviceId: string | null
-  deviceSecret: string | null
   user: UserInfo | null
   isAuthenticated: boolean
 
   // Actions
-  setAuth: (response: AuthResponse) => void
+  setAuthFromLogin: (response: LoginResponse) => void
+  setAuthFromSetPassword: (response: SetPasswordResponse) => void
   setUser: (user: UserInfo) => void
   logout: () => void
 }
@@ -20,21 +20,25 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       token: null,
       deviceId: null,
-      deviceSecret: null,
       user: null,
       isAuthenticated: false,
 
-      setAuth: (response: AuthResponse) => {
+      setAuthFromLogin: (response: LoginResponse) => {
+        localStorage.setItem('access_token', response.access_token)
+
+        set({
+          token: response.access_token,
+          isAuthenticated: true,
+        })
+      },
+
+      setAuthFromSetPassword: (response: SetPasswordResponse) => {
         localStorage.setItem('access_token', response.access_token)
         localStorage.setItem('device_id', response.device_id)
-        if (response.device_secret) {
-          localStorage.setItem('device_secret', response.device_secret)
-        }
 
         set({
           token: response.access_token,
           deviceId: response.device_id,
-          deviceSecret: response.device_secret || null,
           isAuthenticated: true,
         })
       },
@@ -46,12 +50,10 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('access_token')
         localStorage.removeItem('device_id')
-        localStorage.removeItem('device_secret')
 
         set({
           token: null,
           deviceId: null,
-          deviceSecret: null,
           user: null,
           isAuthenticated: false,
         })

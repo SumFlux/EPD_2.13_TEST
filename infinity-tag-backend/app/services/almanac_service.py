@@ -68,8 +68,8 @@ class AlmanacService:
         fortune = generate_personalized_fortune(
             user_bazi_day=profile.bazi_day or "甲子",
             today_gan=bazi_today['day'],
-            profession=profile.profession,
-            focus_areas=profile.focus_areas
+            profession=profile.occupation,
+            focus_areas=None  # notes 是文本备注，不再是列表
         )
 
         favorable = fortune['favorable']
@@ -90,8 +90,8 @@ class AlmanacService:
             commentary = await ai_service.generate_almanac_commentary(
                 bazi=user_bazi,
                 ganzhi_day=bazi_today['day'],
-                profession=profile.profession,
-                focus_areas=profile.focus_areas
+                profession=profile.occupation,
+                focus_areas=None  # notes 是文本备注，不再是列表
             )
         except Exception:
             commentary = "今日运势平稳，宜静思己过，勿急躁冒进。"
