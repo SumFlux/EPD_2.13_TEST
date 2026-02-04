@@ -3,7 +3,6 @@ import { useAuthStore } from '@/stores'
 
 const navItems = [
   { path: '/almanac', label: '运势' },
-  { path: '/profile', label: '档案' },
   { path: '/images', label: '图片' },
 ]
 
@@ -19,9 +18,9 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* 顶部导航 */}
-      <header className="bg-background-secondary border-b border-border/30">
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* 顶部导航 - 固定高度 */}
+      <header className="flex-shrink-0 bg-background-secondary border-b border-border/30">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gradient">无止便签</h1>
           <button
@@ -33,13 +32,13 @@ export default function Layout() {
         </div>
       </header>
 
-      {/* 主内容 */}
-      <main className="flex-1">
+      {/* 主内容 - 填充剩余空间，内部滚动 */}
+      <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
 
-      {/* 底部导航 */}
-      <nav className="bg-background-secondary border-t border-border/30">
+      {/* 底部导航 - 固定在底部 */}
+      <nav className="flex-shrink-0 bg-background-secondary border-t border-border/30">
         <div className="max-w-2xl mx-auto px-4">
           <div className="flex">
             {navItems.map((item) => (

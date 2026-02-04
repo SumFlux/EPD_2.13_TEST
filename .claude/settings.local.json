@@ -24,7 +24,9 @@
       "Bash(\"venv/Scripts/uvicorn\":*)",
       "Bash(\"venv/Scripts/alembic\" revision:*)",
       "Bash(\"venv/Scripts/alembic\" upgrade:*)",
-      "Bash(\"venv/Scripts/pip\" install:*)"
+      "Bash(\"venv/Scripts/pip\" install:*)",
+      "Bash(tree:*)",
+      "Bash(ruff check:*)"
     ]
   },
   "enabledPlugins": {

@@ -19,8 +19,6 @@
 
 ```bash
 # 安装依赖
-pnpm install
-# 或
 npm install
 
 # 复制环境变量模板
@@ -32,8 +30,6 @@ cp .env.example .env
 ### 2. 启动开发服务器
 
 ```bash
-pnpm dev
-# 或
 npm run dev
 ```
 
@@ -42,12 +38,10 @@ npm run dev
 ### 3. 生产构建
 
 ```bash
-pnpm build
-# 或
 npm run build
 
 # 预览生产构建
-pnpm preview
+npm run preview
 ```
 
 ## 项目结构
@@ -111,10 +105,10 @@ infinity-tag-frontend/
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm dev` | 启动开发服务器 (HMR) |
-| `pnpm build` | TypeScript 编译 + 生产构建 |
-| `pnpm preview` | 预览生产构建 |
-| `pnpm lint` | ESLint 代码检查 |
+| `npm run dev` | 启动开发服务器 (HMR) |
+| `npm run build` | TypeScript 编译 + 生产构建 |
+| `npm run preview` | 预览生产构建 |
+| `npm run lint` | ESLint 代码检查 |
 
 ## 环境变量
 

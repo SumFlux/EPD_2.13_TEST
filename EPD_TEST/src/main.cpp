@@ -81,10 +81,16 @@ static uint8_t g_lastEncState = 0;
 static volatile int8_t g_encoderSteps = 0;
 
 // ==========================================
+// UUID 缓冲区 (从 eFuse MAC 生成)
+// ==========================================
+char g_uuid[18] = {0}; // 格式: XXXXXXXXXXXX (12个十六进制字符)
+
+// ==========================================
 // 函数前向声明
 // ==========================================
 void updateDisplay();
 void drawVersion();
+void drawUUID();
 
 // ==========================================
 // 工具函数
@@ -193,6 +199,22 @@ void drawVersion() {
 }
 
 // ==========================================
+// 绘制 UUID (左下角)
+// ==========================================
+void drawUUID() {
+  display.setPartialWindow(0, 100, 95, 20);
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+    display.setTextColor(GxEPD_BLACK);
+    display.setTextSize(1);
+    display.setCursor(2, 106);
+    display.print(g_uuid);
+  } while (display.nextPage());
+  waitBusyWithMargin();
+}
+
+// ==========================================
 // 轻度恢复（闪白）
 // ==========================================
 void lightRecovery() {
@@ -240,6 +262,7 @@ void forceFullRefresh() {
 
   drawContent();
   drawVersion();
+  drawUUID();
 
   Serial.printf(">> Full refresh done. Value: %d\n", g_displayValue);
 }
@@ -255,6 +278,7 @@ void checkRecovery() {
     g_partialCount = 0;
     drawContent();
     drawVersion();
+    drawUUID();
     return;
   }
 
@@ -316,6 +340,12 @@ void setup() {
   display.epd2.selectSPI(SPI, SPISettings(SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
   display.setRotation(1);
 
+  // 读取 ESP32 唯一 ID (eFuse MAC)
+  uint64_t mac = ESP.getEfuseMac();
+  snprintf(g_uuid, sizeof(g_uuid), "%04X%08X", (uint16_t)(mac >> 32),
+           (uint32_t)mac);
+  Serial.printf(">> UUID: %s\n", g_uuid);
+
   // 初始清屏
   Serial.println(">> Initial clear...");
   display.setFullWindow();
@@ -327,6 +357,7 @@ void setup() {
   // 显示初始内容
   drawContent();
   drawVersion();
+  drawUUID();
 
   Serial.println("\n>> Ready! Rotate encoder or shake device.");
 }

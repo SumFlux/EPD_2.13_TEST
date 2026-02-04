@@ -8,7 +8,7 @@
 
 确保你的系统已安装以下工具：
 - **Node.js 18+** (推荐 20 LTS)
-- **pnpm 8+** (推荐) 或 npm 9+
+- **npm 9+**
 
 ### 2. 初始化项目
 
@@ -17,8 +17,8 @@
 git clone <repository_url>
 cd infinity-tag-frontend
 
-# 安装依赖 (推荐使用 pnpm)
-pnpm install
+# 安装依赖
+npm install
 
 # 配置环境变量
 cp .env.example .env
@@ -28,7 +28,7 @@ cp .env.example .env
 ### 3. 启动开发服务器
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 访问 http://localhost:5173，支持热模块替换 (HMR)。
@@ -108,10 +108,10 @@ src/
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm dev` | 启动开发服务器 (Vite HMR) |
-| `pnpm build` | TypeScript 编译 + Vite 生产构建 |
-| `pnpm preview` | 本地预览生产构建 |
-| `pnpm lint` | ESLint 代码检查 |
+| `npm run dev` | 启动开发服务器 (Vite HMR) |
+| `npm run build` | TypeScript 编译 + Vite 生产构建 |
+| `npm run preview` | 本地预览生产构建 |
+| `npm run lint` | ESLint 代码检查 |
 
 ## 📦 状态管理
 
@@ -188,10 +188,10 @@ export const exampleApi = {
 
 ```bash
 # 运行单元测试
-pnpm test
+npm test
 
 # 运行 E2E 测试
-pnpm test:e2e
+npm run test:e2e
 ```
 
 ## 🚀 提交规范
