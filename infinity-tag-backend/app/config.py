@@ -95,6 +95,14 @@ class Settings(BaseSettings):
         "https://www.infinitytag.app"
     ]
 
+    # ====================================
+    # 静态资源配置
+    # ====================================
+    import os
+    BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ASSETS_DIR: str = os.path.join(BASE_DIR, "assets")
+    FONT_DIR: str = os.path.join(ASSETS_DIR, "fonts")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -14,7 +14,14 @@
       "Bash(alembic upgrade:*)",
       "Bash(python:*)",
       "Bash(uvicorn:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(powershell:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(\"venv/Scripts/python\":*)",
+      "Bash(tasklist)",
+      "Bash(\"venv/Scripts/uvicorn\":*)"
     ]
   },
   "enabledPlugins": {

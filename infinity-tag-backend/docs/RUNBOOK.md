@@ -1,68 +1,82 @@
-# Runbook / Operations Guide
+# 运维操作手册 (Runbook)
 
-## Deployment Procedures
+本文档用于指导生产环境的部署、配置维护以及常见故障处理。
 
-### Docker Deployment (Recommended)
+## 📦 部署配置
 
-The system is containerized using Docker Compose.
+### 1. 静态资源部署 (字体)
+
+服务端渲染引擎依赖于字体文件。请确保在服务器上正确放置了字体文件。
+
+**路径：**
+`infinity-tag-backend/assets/fonts/`
+
+**必须包含的文件：**
+- `ChangBanDianSong-12.ttf` (默认字体)
+
+如果需要添加新字体：
+1. 将 `.ttf` 或 `.otf` 文件上传至 `assets/fonts/` 目录。
+2. 重启应用服务以确保缓存刷新（虽然引擎有热加载，但重启更稳妥）。
+
+### 2. Docker 部署更新
+
+当代码更新包含新的依赖（如 `Pillow`）时，需要重新构建镜像：
 
 ```bash
-# 1. Build and Start Services
-docker-compose up -d --build
-
-# 2. View Logs
-docker-compose logs -f backend
-
-# 3. Stop Services
+# 停止旧服务
 docker-compose down
+
+# 重新构建并启动
+docker-compose up -d --build
 ```
 
-### Environment Variables
+### 3. 环境变量检查
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `APP_NAME` | Application Name | Infinity Tag Backend |
-| `ENVIRONMENT` | deployment env (development/production) | production |
-| `MYSQL_HOST` | Database Host | localhost |
-| `MYSQL_PASSWORD` | Database Password | - |
-| `REDIS_HOST` | Redis Host | localhost |
-| `AI_API_KEY` | DMXAPI/OpenAI Key | - |
-| `JWT_SECRET_KEY` | Secret for JWT Token generation | - |
-| `FORCE_HTTPS` | Enforce HTTPS redirect | True |
+确保 `.env` 文件中包含以下核心配置（通常不需要变动，但需检查）：
 
-See `.env.example` for full list.
+```ini
+# 静态资源基础路径（通常自动获取，无需手动设置，但需确保目录存在）
+# ASSETS_DIR=...
+```
 
-## Monitoring & Troubleshooting
+## 🔍 监控与日志
 
-### Common Issues
+### 查看渲染服务日志
 
-#### 1. Database Connection Failed
-- **Symptoms**: 500 Errors, "Access denied", "Can't connect to MySQL server".
-- **Fix**:
-  - Check `MYSQL_HOST` and `MYSQL_PORT` in `.env`.
-  - If running in Docker, ensure host is `mysql`.
-  - If running locally, ensure host is `localhost`.
-  - Verify password matches local DB.
+如果墨水屏显示异常（如空白、乱码），请过滤渲染相关的日志：
 
-#### 2. AI Service Timeout
-- **Symptoms**: 503 Service Unavailable on Almanac/Divination endpoints.
-- **Fix**:
-  - Check `AI_API_KEY` validity.
-  - Verify network connectivity to `https://www.dmxapi.cn`.
-  - Check logs: `docker-compose logs -f backend`.
-
-#### 3. Port Conflicts
-- **Symptoms**: `[Errno 10048] error while attempting to bind on address`.
-- **Fix**:
-  - Check if another instance is running: `lsof -i :8000` or `netstat -ano | findstr 8000`.
-  - Kill the process or change port in `docker-compose.yml` / `uvicorn` command.
-
-### Maintenance
-
-#### Database Backup
 ```bash
-docker-compose exec mysql mysqldump -u infinitytag -p infinity_tag > backup.sql
+# 查看后端日志
+docker-compose logs -f backend | grep "renderer"
 ```
 
-#### Log Rotation
-Logs are currently output to stdout/stderr. Rely on Docker's logging driver for rotation.
+**常见错误：**
+- `[WARN] Font not found`: 字体文件缺失，系统回退到了默认字体（通常不支持中文）。
+  - **解决**：上传缺失的字体文件到 `assets/fonts/`。
+- `IOError: cannot open resource`: 图片生成失败，可能是内存不足或字体损坏。
+
+## 🛠 常见故障处理 (Troubleshooting)
+
+### Q1: 生成的图片全是方框 (□□□)
+**原因**：缺少中文字体。
+**解决**：
+1. 检查服务器 `assets/fonts/` 目录下是否有中文字体。
+2. 确认 `renderer_engine.py` 中引用的字体文件名与实际文件一致。
+
+### Q2: 接口响应慢
+**原因**：字体加载或图片处理耗时。
+**解决**：
+1. 渲染引擎已实现字体缓存 (`self.fonts` 字典)，正常情况下只有第一次请求较慢。
+2. 检查服务器 CPU 负载。
+
+### Q3: 墨水屏显示模糊
+**原因**：二值化算法或分辨率不匹配。
+**解决**：
+1. 确认请求的是 `/renderer/bitmap` 接口而非 `/renderer/preview`。
+2. 确认设备分辨率是否为 `250x122`。
+
+## 🔄 备份策略
+
+- **数据库**: 每日自动备份 MySQL。
+- **配置**: 定期备份 `.env` 文件。
+- **静态资源**: `assets/` 目录纳入版本控制或单独备份。

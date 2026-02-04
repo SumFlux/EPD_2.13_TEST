@@ -90,10 +90,13 @@ infinity-tag-backend/
 - ✅ **黄历系统** - AI 个性化生成 + 30天历史
 - ✅ **解字系统** - AI 解签 + Prompt 注入防护
 - ✅ **灵签速断** - 传统灵签抽取
+- ✅ **服务端渲染 (SSR)** - 针对 E-ink 墨水屏的位图生成 (Bitmap/dithered)
 - ✅ **乾坤一掷** - 掷币决策
 
 ## 文档
 
+- [开发贡献指南 (CONTRIB)](docs/CONTRIB.md)
+- [运维操作手册 (RUNBOOK)](docs/RUNBOOK.md)
 - [环境配置详细教程](doc/教程/环境配置详细教程.md)
 - [本地调试指南](doc/教程/本地调试指南.md)
 - [API 接口调用规范](doc/教程/API接口调用规范.md)
