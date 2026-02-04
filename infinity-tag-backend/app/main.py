@@ -3,8 +3,10 @@ Infinity Tag Backend - FastAPI 应用入口
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from app.config import settings
+import os
 
 # 创建 FastAPI 应用实例
 app = FastAPI(
@@ -14,6 +16,14 @@ app = FastAPI(
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
 )
+
+# ====================================
+# 挂载静态资源 (用于图片预览)
+# ====================================
+assets_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+if not os.path.exists(assets_path):
+    os.makedirs(assets_path)
+app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
 
 # ====================================
 # CORS 中间件配置

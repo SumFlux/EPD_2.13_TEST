@@ -15,11 +15,8 @@ async def activate_device(
     设备激活/注册接口
     返回: Token + Device Secret (仅一次)
     """
-    return await AuthService.activate_device(
-        db,
-        request.device_id,
-        request.password
-    )
+    service = AuthService(db)
+    return await service.activate_device(request)
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
@@ -30,11 +27,8 @@ async def login(
     设备登录接口
     返回: 仅 Token
     """
-    return await AuthService.login(
-        db,
-        request.device_id,
-        request.password
-    )
+    service = AuthService(db)
+    return await service.login(request)
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(

@@ -19,6 +19,7 @@ class User(BaseModel):
     profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     almanacs = relationship("AlmanacHistory", back_populates="user", cascade="all, delete-orphan")
     divination_records = relationship("DivinationRecord", back_populates="user", cascade="all, delete-orphan")
+    images = relationship("CustomImage", back_populates="user", cascade="all, delete-orphan")
 
 class UserProfile(BaseModel):
     """

@@ -5,6 +5,7 @@
 from typing import List, Optional
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
 
 
 class Settings(BaseSettings):
@@ -98,7 +99,6 @@ class Settings(BaseSettings):
     # ====================================
     # 静态资源配置
     # ====================================
-    import os
     BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ASSETS_DIR: str = os.path.join(BASE_DIR, "assets")
     FONT_DIR: str = os.path.join(ASSETS_DIR, "fonts")

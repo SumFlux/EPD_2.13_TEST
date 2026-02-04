@@ -5,6 +5,7 @@ from app.models.base import Base, BaseModel
 from app.models.user import User, UserProfile
 from app.models.almanac import AlmanacHistory
 from app.models.divination import DivinationRecord
+from app.models.image import CustomImage
 from app.models.system import SystemConfig
 
 # 方便导入
@@ -15,5 +16,6 @@ __all__ = [
     "UserProfile",
     "AlmanacHistory",
     "DivinationRecord",
+    "CustomImage",
     "SystemConfig"
 ]

@@ -21,7 +21,10 @@
       "Bash(taskkill:*)",
       "Bash(\"venv/Scripts/python\":*)",
       "Bash(tasklist)",
-      "Bash(\"venv/Scripts/uvicorn\":*)"
+      "Bash(\"venv/Scripts/uvicorn\":*)",
+      "Bash(\"venv/Scripts/alembic\" revision:*)",
+      "Bash(\"venv/Scripts/alembic\" upgrade:*)",
+      "Bash(\"venv/Scripts/pip\" install:*)"
     ]
   },
   "enabledPlugins": {

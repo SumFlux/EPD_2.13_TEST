@@ -7,20 +7,23 @@
 ### 1. 基础依赖
 
 确保你的系统已安装以下工具：
-- **Python 3.11+**
+- **Python 3.9+**
 - **MySQL 8.0+**
-- **Redis 5.0+**
+- **Redis 6.0+**
 
 ### 2. 初始化项目
 
 ```bash
-# 克隆仓库（如果你还没做）
+# 克隆仓库
 git clone <repository_url>
 cd infinity-tag-backend
 
 # 创建虚拟环境
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Windows
+venv\Scripts\activate
+# Linux/macOS
+source venv/bin/activate
 
 # 安装依赖
 pip install -r requirements.txt
@@ -30,74 +33,113 @@ cp .env.example .env
 # 编辑 .env 填入数据库密码和 API Key
 ```
 
+### 3. 数据库迁移
+
+项目使用 Alembic 进行数据库版本控制。
+
+```bash
+# 生成新的迁移脚本 (修改 models 后运行)
+alembic revision --autogenerate -m "description of changes"
+
+# 应用迁移 (更新数据库结构)
+alembic upgrade head
+```
+
+### 4. 启动开发服务器
+
+使用 Uvicorn 启动热重载开发服务器：
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## 🖼 图片处理模块指南 (New)
+
+本项目包含高级图片处理功能（抖动算法、旋转、反色等），专为 EPD（电子墨水屏）设备优化。
+
+### 核心 API 流程
+
+1. **预览 (/preview)**:
+   - 前端上传图片 + JSON 参数。
+   - 后端实时处理并返回图片流。
+   - **特性**: 不保存到数据库，仅供用户调整参数。
+
+2. **上传 (/images/)**:
+   - 上传图片并应用处理参数。
+   - 保存到服务器 `assets/` 目录，生成数据库记录。
+   - 返回图片 URL 和 ID。
+
+3. **获取位图 (/images/{id}/bitmap)**:
+   - 获取供 ESP32 直接使用的原始位图数据（二值化后的 buffer）。
+
+### 常用处理参数 (JSON)
+
+在上传或预览时，通过 `options` 字段传递 JSON 字符串：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `dither` | bool | false | 是否启用 Floyd-Steinberg 抖动算法 |
+| `threshold` | int | 128 | 二值化阈值 (0-255，仅当 dither=false 时生效) |
+| `invert` | bool | false | 是否反色 (黑白颠倒) |
+| `rotate` | int | 0 | 旋转角度 (支持 0, 90, 180, 270) |
+| `crop_x/y/w/h`| int | - | 裁剪区域 (可选) |
+
+### 测试脚本使用
+
+我们提供了完整的 Python 脚本来验证图片处理流程，无需前端即可测试后端逻辑。
+
+#### 1. 基础流程测试
+测试基本的登录、上传图片、获取列表和下载位图功能。
+```bash
+python scripts/test_image_flow.py
+```
+
+#### 2. 高级功能测试
+测试实时预览接口、旋转、反色、裁剪等高级参数组合。
+```bash
+python scripts/test_advanced_image_flow.py
+```
+> **提示**: 运行高级测试后，会在根目录生成 `preview_result.png`，请打开查看处理效果。
+
 ## 🧪 测试流程
 
-我们在项目中实施了严格的测试标准，提交代码前请务必通过所有测试。
+提交代码前请务必通过所有测试。
 
 ### 运行单元测试
-
-使用 `pytest` 运行所有测试用例：
-
 ```bash
 pytest tests/ -v
 ```
 
-### 运行渲染引擎测试 (New)
-
-针对新增的 E-ink 渲染功能，我们提供了专门的视觉测试脚本。该脚本会生成预览图片，用于检查布局和字体渲染效果。
-
+### 运行渲染引擎测试
+针对 E-ink 渲染功能（文字排版）的视觉测试：
 ```bash
-# 运行渲染器测试脚本
 python scripts/test_renderer.py
 ```
-
-**检查结果：**
-运行后，请检查生成的 `test_render_preview.png` 图片，确认：
-1. 文字是否清晰可见（无乱码）。
-2. 布局是否符合 250x122 分辨率限制。
-3. 二值化（Dithering）效果是否正常。
+*检查生成的 `test_render_preview.png` 确认字体和布局正常。*
 
 ## 🎨 代码风格
 
-本项目遵循严格的代码规范：
-
-- **格式化**: 使用 `black`
-- **Linting**: 使用 `flake8`
-- **类型检查**: 使用 `mypy`
-
-```bash
-# 自动格式化
-black app/ scripts/ tests/
-
-# 代码检查
-flake8 app/
-```
+- **格式化**: `black app/ scripts/ tests/`
+- **Linting**: `flake8 app/`
+- **类型检查**: `mypy app/`
 
 ## 📂 目录结构说明
 
 ```
 app/
 ├── api/
-│   └── v1/endpoints/renderer.py  # [新增] 渲染相关接口
+│   └── v1/endpoints/
+│       ├── images.py         # [核心] 图片上传与处理接口
+│       └── renderer.py       # 文字渲染相关接口
 ├── core/
-│   ├── renderer_engine.py        # [新增] 墨水屏渲染核心引擎
-│   └── renderer/                 # 渲染器辅助类
+│   └── renderer_engine.py    # 墨水屏渲染核心引擎
 ├── services/
-│   └── renderer_service.py       # 渲染业务逻辑
+│   ├── image_service.py      # 图片数据库业务逻辑
+│   └── image_processing.py   # [核心] Pillow 图片处理算法 (抖动/裁剪等)
 assets/
-└── fonts/                        # [新增] 字体文件存放目录
+└── fonts/                    # 字体文件存放目录
 ```
 
 ## 🚀 提交规范
 
-请遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
-
-- `feat`: 新功能
-- `fix`: 修复 Bug
-- `docs`: 文档变更
-- `style`: 代码格式（不影响逻辑）
-- `refactor`: 重构
-- `test`: 测试相关
-
----
-**Happy Coding!** 🚀
+遵循 Conventional Commits 规范 (`feat`, `fix`, `docs`, `style`, `refactor`, `test`).
