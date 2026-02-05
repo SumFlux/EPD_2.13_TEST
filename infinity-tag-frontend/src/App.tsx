@@ -5,7 +5,7 @@ import { SetupPage, SetPasswordPage } from '@/features/auth'
 import { ProfilePage } from '@/features/profile'
 import { AlmanacPage, AlmanacDetailPage } from '@/features/almanac'
 import { ImagesPage } from '@/features/images'
-import { AdminLoginPage, DashboardPage, DevicesPage, UsersPage } from '@/features/admin'
+import { AdminLoginPage, DashboardPage, DevicesPage, UsersPage, FirmwarePage } from '@/features/admin'
 import Layout from '@/components/common/Layout'
 
 const queryClient = new QueryClient({
@@ -41,6 +41,7 @@ function App() {
           <Route path="/admin/dashboard" element={<DashboardPage />} />
           <Route path="/admin/devices" element={<DevicesPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/firmware" element={<FirmwarePage />} />
 
           {/* 受保护路由 */}
           <Route

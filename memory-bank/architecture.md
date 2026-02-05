@@ -25,6 +25,13 @@
     - 固件上传验证: Admin Token + Checksum 计算
     - 固件下载验证: User/Device Token
     - API 请求验证: 关键业务 (如解字) 强制通过 `X-Signature`, `X-Timestamp` 进行 HMAC-SHA256 签名校验
+    - 脚本安全: 运维脚本 (`upload_firmware.py`) 采用本地 `.env` 配置签发 Token，避免明文密码传输
+
+### 6. 前端架构 (Admin)
+
+- **统一导航**: 使用 `AdminHeader` 组件管理所有管理后台页面的导航结构
+- **拦截器策略**: `client.ts` 区分 Admin/User路由，分别加载 `infinity-tag-admin` 和 `access_token`，解决多账户 Token 冲突问题
+- **状态管理**: 使用 Zustand (`adminStore`) 管理管理员会话和设备列表状态
 
 ## 硬件配置
 

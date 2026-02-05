@@ -114,6 +114,19 @@ export const adminApi = {
    */
   disableUser: async (userId: number): Promise<void> => {
     await apiClient.put(`/admin/users/${userId}/disable`)
+  },
+
+  /**
+   * 上传固件 (OTA)
+   */
+  uploadFirmware: async (formData: FormData): Promise<any> => {
+    // 注意: 必须显式移除 Content-Type，否则 client.ts 的默认 application/json 会被使用，导致 boundary 丢失
+    const response = await apiClient.post('/ota/upload', formData, {
+      headers: {
+        'Content-Type': undefined
+      }
+    })
+    return response.data
   }
 }
 

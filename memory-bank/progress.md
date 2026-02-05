@@ -13,8 +13,13 @@
 ### 2026-02-06
 
 - [x] **OTA 固件管理后端**: 完成固件模型、上传/下载 API 开发，支持版本号校验和 HMAC 签名验证
-- [x] **安全增强**: 全面实现 Admin 接口鉴权，解字接口增加请求签名校验
-- [x] **前端二维码集成**: Admin 后台集成 `qrcode.react`，支持生成设备激活二维码
+- [x] **安全增强**: 全面实现 Admin 接口鉴权，解字接口增加请求签名校验，优化 `upload_firmware.py` 脚本使用本地 Token 签发代替明文密码
+- [x] **前端架构重构**: 
+    - 实现 `AdminHeader` 组件，统一 Dashboard/Device/User/Firmware 页面导航
+    - 修复 Admin 页面语法错误 (Duplicate Return/Div)
+    - 优化 `client.ts` 拦截器，解决 Admin/User Token 冲突和 401 跳转问题
+- [x] **前端 OTA 功能**: 完成固件上传页面开发，修复 Content-Type 导致的 422 错误
+- [x] **运维工具**: 优化 `upload_firmware.py` 脚本，支持从 `.env` 读取配置，提升安全性
 
 ### 2026-02-04
 

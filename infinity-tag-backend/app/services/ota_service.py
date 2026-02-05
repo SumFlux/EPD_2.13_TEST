@@ -85,7 +85,7 @@ class OTAService:
 
         # 保存文件
         filename = f"firmware_v{version_str}.bin"
-        file_path = os.path.join(self.FIRMWARE_DIR, filename)
+        file_path = os.path.join(self.FIRMWARE_DIR, filename).replace("\\", "/")
         
         try:
             with open(file_path, "wb") as buffer:

@@ -14,11 +14,12 @@ export const apiClient = axios.create({
 // 请求拦截器 - 添加 token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 优先使用用户 token，如果没有则尝试使用管理员 token
-    let token = localStorage.getItem('access_token')
+    let token: string | null = null
+    const url = config.url || ''
+    const isAdminRequest = url.startsWith('/admin') || url.includes('/ota/upload')
 
-    // 如果是 admin 接口，尝试从 adminStore 获取 token
-    if (!token && config.url?.startsWith('/admin')) {
+    if (isAdminRequest) {
+      // 管理员接口，只使用管理员 token
       const adminStoreData = localStorage.getItem('infinity-tag-admin')
       if (adminStoreData) {
         try {
@@ -28,6 +29,9 @@ apiClient.interceptors.request.use(
           // 解析失败，忽略
         }
       }
+    } else {
+      // 普通接口，使用用户 token
+      token = localStorage.getItem('access_token')
     }
 
     if (token && config.headers) {
@@ -48,7 +52,10 @@ apiClient.interceptors.response.use(
       const requestUrl = error.config?.url || ''
 
       // 根据请求路径决定跳转目标
-      if (requestUrl.startsWith('/admin')) {
+      if (requestUrl.includes('/login')) {
+        // 登录接口自身的 401 错误，不跳转，交由组件处理错误提示
+        return Promise.reject(error)
+      } else if (requestUrl.startsWith('/admin')) {
         // 管理员接口 401，清除管理员状态并跳转
         localStorage.removeItem('infinity-tag-admin')
         window.location.href = ROUTES.ADMIN_LOGIN
@@ -56,7 +63,7 @@ apiClient.interceptors.response.use(
         // 用户接口 401，清除所有用户状态并跳转
         localStorage.removeItem('access_token')
         localStorage.removeItem('device_id')
-        localStorage.removeItem('infinity-tag-auth')  // 清除 Zustand persist 状态
+        localStorage.removeItem('infinity-tag-auth')
         window.location.href = ROUTES.SETUP
       }
     }

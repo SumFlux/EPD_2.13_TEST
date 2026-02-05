@@ -5,6 +5,7 @@ import { useAdminStore } from '@/stores/adminStore'
 import { adminApi } from '@/api/admin'
 import { logger } from '@/utils/logger'
 import type { Device, DeviceCreateResponse } from '@/types/admin'
+import { AdminHeader } from './AdminHeader'
 
 export function DevicesPage() {
   const navigate = useNavigate()
@@ -125,22 +126,7 @@ export function DevicesPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">设备管理</h1>
-          <div className="flex items-center space-x-4">
-            <button onClick={() => navigate('/admin/dashboard')} className="text-gray-600 hover:text-gray-800">
-              仪表盘
-            </button>
-            <button onClick={() => navigate('/admin/users')} className="text-gray-600 hover:text-gray-800">
-              用户管理
-            </button>
-            <button onClick={() => { adminLogout(); navigate('/admin/login') }} className="text-red-600 hover:text-red-800">
-              退出
-            </button>
-          </div>
-        </div>
-      </nav>
+      <AdminHeader title="设备管理" />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">

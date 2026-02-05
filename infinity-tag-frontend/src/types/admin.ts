@@ -102,3 +102,15 @@ export interface AdminStats {
   total_users: number
   users_with_password: number
 }
+
+// ---------- 固件管理 ----------
+export interface FirmwareResponse {
+  id: number
+  version_str: string
+  version_code: number
+  file_path: string
+  checksum: string
+  description?: string
+  is_active: boolean
+  created_at: string
+}
