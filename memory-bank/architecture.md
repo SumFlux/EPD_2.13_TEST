@@ -18,6 +18,14 @@
 普通局刷 → 每3次闪白 → 每20次深度恢复
 ```
 
+### 5. OTA 与 安全架构
+
+- **版本控制**: 严格递增的 4 位版本号 (A.B.C.D)，防止降级攻击
+- **安全校验**: 
+    - 固件上传验证: Admin Token + Checksum 计算
+    - 固件下载验证: User/Device Token
+    - API 请求验证: 关键业务 (如解字) 强制通过 `X-Signature`, `X-Timestamp` 进行 HMAC-SHA256 签名校验
+
 ## 硬件配置
 
 | 接口 | GPIO |

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { useAdminStore } from '@/stores/adminStore'
 import { adminApi } from '@/api/admin'
 import { logger } from '@/utils/logger'
@@ -11,11 +12,18 @@ export function DevicesPage() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>('')
+
+  // Create Modal
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newUuid, setNewUuid] = useState('')
   const [batchName, setBatchName] = useState('')
   const [createResult, setCreateResult] = useState<DeviceCreateResponse | null>(null)
   const [createError, setCreateError] = useState('')
+
+  // QR Modal (List View)
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [selectedDeviceQr, setSelectedDeviceQr] = useState<string>('')
+  const [selectedDeviceCode, setSelectedDeviceCode] = useState<string>('')
 
   useEffect(() => {
     if (!isAdminAuthenticated) {
@@ -88,6 +96,13 @@ export function DevicesPage() {
     } catch (err) {
       logger.error('删除设备失败', err)
     }
+  }
+
+  const handleShowQr = (device: Device) => {
+    const url = `https://talisman.app/setup?code=${device.device_code}`
+    setSelectedDeviceQr(url)
+    setSelectedDeviceCode(device.device_code)
+    setShowQrModal(true)
   }
 
   const getStatusBadge = (status: string) => {
@@ -176,6 +191,11 @@ export function DevicesPage() {
                         {new Date(device.created_at).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                        {device.status === 'pending' && (
+                          <button onClick={() => handleShowQr(device)} className="text-blue-600 hover:text-blue-800">
+                            二维码
+                          </button>
+                        )}
                         {device.status === 'activated' && (
                           <button onClick={() => handleResetDevice(device)} className="text-yellow-600 hover:text-yellow-800">
                             重置
@@ -219,6 +239,7 @@ export function DevicesPage() {
           </>
         )}
 
+        {/* Create Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -255,7 +276,13 @@ export function DevicesPage() {
                     <p className="text-green-800 font-medium mb-2">创建成功！</p>
                     <p className="text-sm"><span className="font-medium">设备码：</span>{createResult.device_code}</p>
                     <p className="text-sm"><span className="font-medium">初始密码：</span>{createResult.init_password}</p>
-                    <p className="text-xs text-gray-500 mt-2">请妥善保存初始密码，仅显示一次</p>
+                    <div className="mt-4 flex flex-col items-center p-2 bg-white rounded border">
+                      <QRCodeSVG
+                        value={`https://talisman.app/setup?code=${createResult.device_code}&pwd=${createResult.init_password}`}
+                        size={160}
+                      />
+                      <p className="text-xs text-gray-500 mt-2">扫码一键激活 (含密码)</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -285,6 +312,32 @@ export function DevicesPage() {
             </div>
           </div>
         )}
+
+        {/* QR Code Modal (Simple) */}
+        {showQrModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-sm text-center">
+              <h3 className="text-lg font-bold mb-4">设备二维码</h3>
+              <p className="text-sm text-gray-600 mb-4 font-mono font-bold">{selectedDeviceCode}</p>
+
+              <div className="flex justify-center p-4 bg-white border rounded mb-4">
+                <QRCodeSVG value={selectedDeviceQr} size={200} />
+              </div>
+
+              <div className="bg-yellow-50 p-3 rounded text-xs text-yellow-800 text-left mb-6">
+                注意：此二维码仅包含连接信息。用户扫码后，仍需手动输入打印在设备/贴纸上的初始密码。
+              </div>
+
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="w-full px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   )

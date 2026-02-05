@@ -127,7 +127,7 @@ export default function AlmanacPage() {
     return { month, day, weekday }
   }
 
-  // 筛选有数据的历史记录（排除今天）
+  // 筛选有数据的历史记录（排除今天，因为今天已在上方完整显示）
   const todayStr = new Date().toISOString().split('T')[0]
   const validHistory = history.filter(h => h && h.date && h.date !== todayStr)
 

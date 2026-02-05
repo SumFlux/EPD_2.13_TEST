@@ -8,6 +8,7 @@ from app.models.almanac import AlmanacHistory
 from app.models.divination import DivinationRecord
 from app.models.image import CustomImage
 from app.models.system import SystemConfig
+from app.models.firmware import Firmware
 
 # 方便导入
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "AlmanacHistory",
     "DivinationRecord",
     "CustomImage",
-    "SystemConfig"
+    "SystemConfig",
+    "Firmware"
 ]

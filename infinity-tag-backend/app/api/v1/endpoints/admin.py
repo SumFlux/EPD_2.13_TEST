@@ -2,9 +2,8 @@
 管理员 API 端点
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from jose import jwt, JWTError
 from app.api import deps
 from app.services.admin_service import AdminService
 from app.services.device_service import DeviceService
@@ -24,31 +23,8 @@ from app.schemas.device import (
     DeviceResponse,
     DeviceListResponse
 )
-from app.config import settings
 
 router = APIRouter()
-
-
-def verify_admin_token(token: str = Depends(deps.oauth2_scheme)) -> str:
-    """验证管理员token"""
-    try:
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM]
-        )
-        subject = payload.get("sub")
-        if not subject or not subject.startswith("admin:"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="需要管理员权限"
-            )
-        return subject.split(":")[1]
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="token已过期或无效"
-        )
 
 
 @router.post("/login", response_model=AdminLoginResponse)
@@ -64,7 +40,7 @@ async def admin_login(
 @router.get("/stats", response_model=AdminStatsResponse)
 async def get_stats(
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """获取统计数据"""
     service = AdminService(db)
@@ -78,7 +54,7 @@ async def get_devices(
     status: Optional[str] = Query(None),
     batch_name: Optional[str] = Query(None),
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """获取设备列表"""
     service = DeviceService(db)
@@ -94,7 +70,7 @@ async def get_devices(
 async def create_device(
     request: DeviceCreateRequest,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """录入单个设备（输入UUID，自动计算设备码和初始密码）"""
     service = DeviceService(db)
@@ -105,7 +81,7 @@ async def create_device(
 async def batch_import_devices(
     request: DeviceBatchImportRequest,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """批量导入设备"""
     service = DeviceService(db)
@@ -116,7 +92,7 @@ async def batch_import_devices(
 async def get_device(
     device_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """获取设备详情"""
     service = DeviceService(db)
@@ -127,7 +103,7 @@ async def get_device(
 async def disable_device(
     device_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """禁用设备"""
     service = DeviceService(db)
@@ -138,7 +114,7 @@ async def disable_device(
 async def reset_device(
     device_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """重置设备（解除激活，恢复初始密码有效）"""
     service = DeviceService(db)
@@ -149,7 +125,7 @@ async def reset_device(
 async def delete_device(
     device_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """删除设备"""
     service = DeviceService(db)
@@ -162,7 +138,7 @@ async def get_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """获取用户列表"""
     service = AdminService(db)
@@ -173,7 +149,7 @@ async def get_users(
 async def get_user_detail(
     user_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """获取用户详情"""
     service = AdminService(db)
@@ -184,7 +160,7 @@ async def get_user_detail(
 async def disable_user(
     user_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(verify_admin_token)
+    _: str = Depends(deps.verify_admin_token)
 ):
     """禁用用户"""
     service = AdminService(db)

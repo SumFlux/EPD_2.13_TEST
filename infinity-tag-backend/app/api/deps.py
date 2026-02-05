@@ -9,6 +9,11 @@ from pydantic import ValidationError
 from app.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.user import User
+from app.core.security import SecurityService
+from fastapi import Request, Header
+import hmac
+import hashlib
+import time
 
 # 修改为 HTTPBearer，方便直接粘贴 Token
 security_scheme = HTTPBearer()
@@ -93,4 +98,76 @@ async def get_temp_token_user_id(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的token格式"
+        )
+
+
+def verify_admin_token(token: str = Depends(oauth2_scheme)) -> str:
+    """验证管理员token"""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        subject = payload.get("sub")
+        if not subject or not subject.startswith("admin:"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="需要管理员权限"
+            )
+        return subject.split(":")[1]
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token已过期或无效"
+        )
+
+
+async def verify_signed_request(
+    request: Request,
+    x_signature: str = Header(..., alias="X-Signature"),
+    x_timestamp: int = Header(..., alias="X-Timestamp"),
+    current_user: User = Depends(get_current_user)
+) -> None:
+    """
+    验证请求签名 (HMAC-SHA256)
+    Payload = Path + Timestamp + Body
+    Secret = Device Init Password Hash (作为设备密钥)
+    """
+    # 1. 获取 Body
+    body_bytes = await request.body()
+    body_str = body_bytes.decode()
+
+    # 2. 构造 Payload (与前端/设备端约定: Path + Timestamp + Body)
+    # 实际构造: Path + Timestamp + Body
+    payload = f"{request.url.path}{x_timestamp}{body_str}"
+
+    # 3. 获取 Secret (假设使用设备初始密码哈希作为密钥，这是设备独有的)
+    # 如果用户未绑定设备，无法验证
+    if not current_user.device:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="用户未绑定设备，无法验证签名"
+        )
+    
+    secret = current_user.device.init_password_hash
+
+    # 4. 验证
+    # 检查时间戳 (例如 5 分钟内)
+    if abs(time.time() - x_timestamp) > 300:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请求时间戳无效或已过期"
+        )
+
+    expected_signature = hmac.new(
+        secret.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(x_signature, expected_signature):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="签名验证失败"
         )

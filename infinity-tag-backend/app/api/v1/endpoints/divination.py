@@ -37,7 +37,8 @@ async def get_word_categories():
 async def interpret_divination(
     request: DivinationRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
+    _: None = Depends(deps.verify_signed_request)
 ):
     """
     解字测算
