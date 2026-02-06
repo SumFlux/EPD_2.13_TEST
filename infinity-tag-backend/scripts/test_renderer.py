@@ -70,9 +70,9 @@ def test_renderer():
     print(f"Saved bitmap to {bin_path}")
 
     print(f"Bitmap size: {len(bitmap_bytes)} bytes")
-    # 250 pixels width -> 32 bytes per row (31 bytes + 2 bits padded to 1 byte)
-    # 32 * 122 = 3904 bytes
-    print(f"Expected approx size: {32 * 122} bytes")
+    # 212 pixels width -> 27 bytes per row (26.5 bytes padded to 27)
+    # 27 * 104 = 2808 bytes
+    print(f"Expected approx size: {27 * 104} bytes")
 
 if __name__ == "__main__":
     test_renderer()

@@ -12,6 +12,11 @@ DEFAULT_API_URL = "http://localhost:8000/api/v1"
 DEFAULT_DEVICE_ID = "sumhello"
 DEFAULT_SECRET = "123456"
 
+# 墨水屏尺寸常量
+EPD_WIDTH = 212
+EPD_HEIGHT = 104
+EPD_ASPECT_RATIO = EPD_HEIGHT / EPD_WIDTH  # 0.4906
+
 class InfinityTagClient(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -101,7 +106,7 @@ class InfinityTagClient(tk.Tk):
         ttk.Button(controls_frame, text="刷新预览", command=self.trigger_preview).grid(row=0, column=5, rowspan=2, padx=10, sticky="ns")
 
         # --- 右侧：预览区 ---
-        right_frame = ttk.LabelFrame(main_pane, text="墨水屏预览 (250x122)", padding=10)
+        right_frame = ttk.LabelFrame(main_pane, text="墨水屏预览 (212x104)", padding=10)
         main_pane.add(right_frame, weight=1)
 
         self.preview_label = ttk.Label(right_frame, text="暂无预览", anchor="center", background="#ffffff")
@@ -196,13 +201,12 @@ class InfinityTagClient(tk.Tk):
     def on_crop_drag(self, event):
         if not self.rect_id: return
 
-        # 强制宽高比 250:122
+        # 强制宽高比 212:104
         start_x, start_y = self.crop_start_x, self.crop_start_y
         current_x, current_y = event.x, event.y
 
         width = abs(current_x - start_x)
-        # height = width * (122 / 250)
-        height = width * 0.488
+        height = width * EPD_ASPECT_RATIO
 
         # 根据拖动方向计算新的 y 坐标
         if current_y < start_y:

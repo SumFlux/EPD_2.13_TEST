@@ -90,8 +90,8 @@ def run_test():
     if resp.status_code == 200:
         bitmap_size = len(resp.content)
         print(f"[+] Bitmap 下载成功! 大小: {bitmap_size} bytes")
-        # 验证大小: 250 * 122 / 8 向上取整 = 3812.5 -> 3813 左右 (取决于 padding 实现)
-        expected_size = ((250 * 122) + 7) // 8
+        # 验证大小: 212 * 104 / 8 向上取整
+        expected_size = ((212 * 104) + 7) // 8
         print(f"    (预期大小: 约 {expected_size} bytes)")
     else:
         print(f"[x] Bitmap 下载失败: {resp.status_code}")

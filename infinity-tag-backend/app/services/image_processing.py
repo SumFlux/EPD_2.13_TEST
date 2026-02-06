@@ -4,11 +4,11 @@ from app.schemas.image import ImageProcessOptions
 
 class ImageProcessor:
     """
-    图片处理服务：处理用户上传的图片，适配 2.13寸 EPD (250x122)
+    图片处理服务：处理用户上传的图片，适配 2.13寸 EPD (212x104)
     """
 
-    TARGET_WIDTH = 250
-    TARGET_HEIGHT = 122
+    TARGET_WIDTH = 212
+    TARGET_HEIGHT = 104
     MAX_PIXELS = 4000000  # 限制最大像素 (2000x2000)，防止 DoS
 
     @classmethod

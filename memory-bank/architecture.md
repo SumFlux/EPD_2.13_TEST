@@ -1,6 +1,6 @@
 # 项目架构文档
 
-> 最后更新: 2026-02-03
+> 最后更新: 2026-02-06
 # ... (omitting header changes to save space)
 
 ### 3. 震动交互 (Shake Action)
@@ -17,6 +17,22 @@
 ```
 普通局刷 → 每3次闪白 → 每20次深度恢复
 ```
+
+### 5. 版本管理
+
+| 文件 | 作用 |
+|------|------|
+| `include/Version.h` | 定义 `VERSION_MAJOR/MINOR/PATCH/BUILD` 宏 |
+| `tools/increment_version.py` | 自动递增 BUILD 号 (0-99 循环) |
+| `build_and_release.md` | 工作流在编译前调用版本递增脚本 |
+
+### 6. 多行显示 (drawInfo)
+
+| 行号 | 内容 | Y坐标 |
+|------|------|-------|
+| 1 | `Firmware: vX.X.X.X` | 92 |
+| 2 | `Encoder: 0-999` | 102 |
+| 3 | `Vibration: 0-99` | 112 |
 
 ### 5. OTA 与 安全架构
 
@@ -48,6 +64,6 @@
 
 ## 技术要点
 
-1. **避免全刷闪烁**：使用 `setPartialWindow(0,0,250,122)` 替代 `setFullWindow()`
+1. **避免全刷闪烁**：使用 `setPartialWindow(0,0,212,104)` 替代 `setFullWindow()`
 2. **编码器防抖**：累积4步才触发1次变化
 3. **摇晃算法**：基于时间窗口的脉冲计数 (Shake Detection)，有效区分误触和有意摇晃
