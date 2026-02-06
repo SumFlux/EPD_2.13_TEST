@@ -1,0 +1,221 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <GxEPD2_BW.h>
+#include <Adafruit_GFX.h>
+
+/*
+ * ESP32-S3 + 2.13寸 (B72) 定制策略终版
+ * --------------------------------------------
+ * 1. [REF_FAST]: 局刷直出 (速度 Max)
+ * 2. [REF_FLICKER]: 局刷擦白 (干净 Max)
+ * 3. [REF_LIGHT]: 软件全刷 (暴力提速版)
+ * -> 移除所有动效 (插帧/百叶窗)。
+ * -> 流程: 全屏黑 -> 全屏白 -> 直接出图。
+ * -> 目的: 用最短时间完成一次全屏底色重置。
+ * 4. [REF_DEEP]: 硬件维护 (电影级过场)
+ * -> 保留 Gray/Inverted Calculating 过场。
+ * -> 保留 硬件全刷清洗。
+ * -> 保留 百叶窗出字动效。
+ */
+
+// ==========================================
+// 1. 硬件引脚
+// ==========================================
+#define PIN_SCK      6
+#define PIN_MOSI     5
+#define PIN_CS       7
+#define PIN_DC       17
+#define PIN_RST      18
+#define PIN_BUSY     8
+#define PIN_POWER_EN 47 
+
+GxEPD2_BW<GxEPD2_213_B72, GxEPD2_213_B72::HEIGHT> display(GxEPD2_213_B72(PIN_CS, PIN_DC, PIN_RST, PIN_BUSY));
+
+const int OFFSET_X = 0;
+const int OFFSET_Y = 18; 
+const int VISIBLE_W = 212;
+const int VISIBLE_H = 104;
+
+enum RefreshMode { REF_FAST, REF_FLICKER, REF_LIGHT, REF_DEEP, _REF_COUNT };
+
+int frameCount = 0;
+int currentRefreshIdx = 0;
+
+void setup() {
+    pinMode(PIN_POWER_EN, OUTPUT);
+    digitalWrite(PIN_POWER_EN, HIGH);
+    delay(50);
+
+    Serial.begin(115200);
+    delay(500);
+    
+    SPI.end(); 
+    SPI.begin(PIN_SCK, -1, PIN_MOSI, PIN_CS);
+    
+    display.init(115200, true, 2, false);
+    display.setRotation(1);
+    
+    // 默认局刷
+    display.setPartialWindow(0, 0, display.width(), display.height());
+
+    Serial.println("--- FINAL SPEED ENGINE ---");
+}
+
+// ==========================================
+// 2. 辅助绘图
+// ==========================================
+void drawContent(int num, const char* label) {
+    display.drawRect(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H, GxEPD_BLACK);
+    display.setTextColor(GxEPD_BLACK);
+    display.setCursor(OFFSET_X + 5, OFFSET_Y + 15);
+    display.setTextSize(2); 
+    display.print(label);
+    display.setCursor(OFFSET_X + 10, OFFSET_Y + 55); 
+    display.setTextSize(5);
+    display.print(num);
+    display.fillRect(OFFSET_X, OFFSET_Y + 100, VISIBLE_W, 3, GxEPD_BLACK);
+}
+
+// 绘制 CALCULATING 基础
+void drawCalculatingBase(bool inverted) {
+    uint16_t bg = inverted ? GxEPD_BLACK : GxEPD_WHITE;
+    uint16_t fg = inverted ? GxEPD_WHITE : GxEPD_BLACK;
+    display.fillScreen(bg);
+    display.setTextColor(fg);
+    display.setTextSize(3); 
+    int str_w = 11 * 18;
+    int start_x = OFFSET_X + (VISIBLE_W - str_w) / 2;
+    int start_y = OFFSET_Y + 40; 
+    display.setCursor(start_x, start_y);
+    display.print("CALCULATING");
+}
+
+// 绘制 灰度 CALCULATING
+void drawGrayCalculating() {
+    drawCalculatingBase(false); 
+    for (int y = OFFSET_Y; y < OFFSET_Y + VISIBLE_H; y++) {
+        for (int x = OFFSET_X; x < OFFSET_X + VISIBLE_W; x++) {
+            if ((x + y) % 2 == 0) display.drawPixel(x, y, GxEPD_WHITE);
+        }
+    }
+}
+
+// 百叶窗遮罩 (仅用于 Deep)
+void applyBlindsMask() {
+    for (int y = OFFSET_Y; y < OFFSET_Y + VISIBLE_H; y++) {
+        if (y % 3 == 0) display.drawFastHLine(OFFSET_X, y, VISIBLE_W, GxEPD_WHITE);
+    }
+}
+
+// ==========================================
+// 3. 核心渲染器
+// ==========================================
+
+// [FAST] 极速直出
+void runFast(int num) {
+    display.setPartialWindow(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H);
+    display.firstPage();
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "FAST");
+    } while (display.nextPage());
+}
+
+// [FLICKER] 纯白擦除
+void runFlicker(int num) {
+    display.setPartialWindow(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H);
+    // Wipe
+    display.firstPage(); do { display.fillScreen(GxEPD_WHITE); } while (display.nextPage());
+    // Draw
+    display.firstPage();
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "FLICKER");
+    } while (display.nextPage());
+}
+
+// [LIGHT] 软件全刷 (极速版)
+// 逻辑: 全黑 -> 全白 -> 直出
+// 没有任何动效，纯粹为了用最短时间重置全屏电荷
+void runLight(int num) {
+    // 覆盖全屏
+    display.setPartialWindow(0, 0, display.width(), display.height());
+
+    // 1. 全屏刷黑 (Flash Black)
+    display.firstPage(); do { display.fillScreen(GxEPD_BLACK); } while (display.nextPage());
+
+    // 2. 全屏刷白 (Flash White)
+    display.firstPage(); do { display.fillScreen(GxEPD_WHITE); } while (display.nextPage());
+
+    // 3. 直接出图 (Direct Draw)
+    // 移除百叶窗插帧，直接画实心
+    display.firstPage(); 
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "LIGHT");
+    } while (display.nextPage());
+}
+
+// [DEEP] 硬件维护 (完整保留电影级过场)
+void runDeep(int num) {
+    display.setPartialWindow(0, 0, display.width(), display.height());
+
+    // 1. 灰度过场
+    display.firstPage(); do { drawGrayCalculating(); } while (display.nextPage());
+
+    // 2. 反色确立
+    display.firstPage(); do { drawCalculatingBase(true); } while (display.nextPage());
+
+    // 3. 硬件清洗 (Hardware Refresh)
+    display.setFullWindow(); 
+    display.firstPage(); do { display.fillScreen(GxEPD_WHITE); } while (display.nextPage());
+
+    // 4. 软件接管显影
+    display.setPartialWindow(0, 0, display.width(), display.height());
+
+    // 4.1 百叶窗插帧
+    display.firstPage(); 
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "DEEP");
+        applyBlindsMask(); 
+    } while (display.nextPage());
+
+    // 4.2 实心 & 加固
+    for(int i=0; i<2; i++) {
+        display.firstPage(); 
+        do {
+            display.fillScreen(GxEPD_WHITE);
+            drawContent(num, "DEEP");
+        } while (display.nextPage());
+    }
+
+    display.powerOff();
+}
+
+void loop() {
+    RefreshMode ref = (RefreshMode)currentRefreshIdx;
+    
+    Serial.printf("Frame %d | Mode: %d\n", frameCount, ref);
+
+    switch(ref) {
+        case REF_FAST:    runFast(frameCount);    break;
+        case REF_FLICKER: runFlicker(frameCount); break;
+        case REF_LIGHT:   runLight(frameCount);   break;
+        case REF_DEEP:    runDeep(frameCount);    break;
+    }
+
+    // 观察延时
+    int wait = 1000;
+    if (ref == REF_DEEP) wait = 2000;
+    delay(wait);
+
+    currentRefreshIdx++;
+    if (currentRefreshIdx >= _REF_COUNT) {
+        currentRefreshIdx = 0;
+        Serial.println(">>> RESTART >>>");
+    }
+
+    frameCount++;
+    if(frameCount > 999) frameCount = 0;
+}

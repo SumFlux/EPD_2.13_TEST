@@ -5,8 +5,8 @@
 			"path": "."
 		},
 		{
-			"name": "EPD_TEST",
-			"path": "EPD_TEST"
+			"name": "infinity-tag-esp32",
+			"path": "infinity-tag-esp32"
 		}
 	],
 	"settings": {}

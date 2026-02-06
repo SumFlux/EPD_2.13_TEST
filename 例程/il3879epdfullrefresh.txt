@@ -1,0 +1,243 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <GxEPD2_BW.h>
+#include <Adafruit_GFX.h>
+
+/*
+ * ESP32-S3 + 2.13寸 (B72) 极速零延时版
+ * --------------------------------------------
+ * 核心修正：
+ * 1. [局刷纯净]: FAST 和 FLICKER 模式下，严禁调用任何动效函数。
+ * 2. [全刷极速]: 移除了 LIGHT 和 DEEP 模式下所有的 delay()。
+ * - 依靠 BUSY 信号和 SPI 极限速度运行。
+ * - 即便是深度清洗，也是"跑着洗"，绝不停顿。
+ * 3. [流程保持]: 全刷依然保留 "前置全屏纹理 -> 清洗 -> 后置字体显影" 的高级感。
+ */
+
+// ==========================================
+// 1. 硬件引脚
+// ==========================================
+#define PIN_SCK      6
+#define PIN_MOSI     5
+#define PIN_CS       7
+#define PIN_DC       17
+#define PIN_RST      18
+#define PIN_BUSY     8
+#define PIN_POWER_EN 47 
+
+GxEPD2_BW<GxEPD2_213_B72, GxEPD2_213_B72::HEIGHT> display(GxEPD2_213_B72(PIN_CS, PIN_DC, PIN_RST, PIN_BUSY));
+
+const int OFFSET_X = 0;
+const int OFFSET_Y = 18; 
+const int VISIBLE_W = 212;
+const int VISIBLE_H = 104;
+
+// ==========================================
+// 2. 特效库
+// ==========================================
+enum EffectType { FX_DIRECT, FX_CHECKERBOARD, FX_BLINDS, FX_NOISE, FX_SLANT, FX_GROOVE, FX_BUBBLES };
+
+enum RefreshMode {
+    REF_FAST,    // 0. 局刷直出 (无动效)
+    REF_FLICKER, // 1. 局刷擦白 (无动效)
+    REF_LIGHT,   // 2. 全刷 (前置动效+后置显影, 0延时)
+    REF_DEEP,    // 3. 深度 (前置动效+后置显影, 0延时)
+    _REF_COUNT
+};
+
+// *** 配置区 ***
+EffectType TARGET_EFFECT = FX_CHECKERBOARD; 
+// *************
+
+int frameCount = 0;
+int currentRefreshIdx = 0;
+
+void setup() {
+    pinMode(PIN_POWER_EN, OUTPUT);
+    digitalWrite(PIN_POWER_EN, HIGH);
+    delay(50); // 硬件上电必须的一点缓冲
+
+    Serial.begin(115200);
+    delay(500);
+    
+    SPI.end(); 
+    SPI.begin(PIN_SCK, -1, PIN_MOSI, PIN_CS);
+    
+    display.init(115200, true, 2, false);
+    display.setRotation(1);
+    
+    // 锁定全屏局刷窗口，榨干每一毫秒性能
+    display.setPartialWindow(0, 0, display.width(), display.height());
+
+    Serial.println("--- ZERO DELAY ENGINE ---");
+}
+
+// ==========================================
+// 3. 辅助绘图
+// ==========================================
+void drawContent(int num, const char* label) {
+    display.drawRect(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H, GxEPD_BLACK);
+    
+    display.setTextColor(GxEPD_BLACK);
+    display.setCursor(OFFSET_X + 5, OFFSET_Y + 15);
+    display.setTextSize(2); 
+    display.print(label);
+
+    display.setCursor(OFFSET_X + 10, OFFSET_Y + 55); 
+    display.setTextSize(5);
+    display.print(num);
+    
+    display.fillRect(OFFSET_X, OFFSET_Y + 100, VISIBLE_W, 3, GxEPD_BLACK);
+}
+
+// 纹理算法
+bool getMaskPixel(int x, int y, EffectType type) {
+    switch (type) {
+        case FX_BLINDS:       return (y % 3 == 0); 
+        case FX_CHECKERBOARD: return ((x % 2 == 0) && (y % 2 == 0)); 
+        case FX_NOISE:        return ((x * 17 + y * 53) % 100 < 40);
+        case FX_SLANT:        return ((x + y) % 4 == 0);
+        case FX_GROOVE:       return (x % 3 == 0);
+        case FX_BUBBLES:      return ((x % 4 == 0) && (y % 4 == 0));
+        default: return false;
+    }
+}
+
+// [用于字体显影]：在黑字上打白洞
+void applyTextureMask(EffectType type) {
+    for (int y = OFFSET_Y; y < OFFSET_Y + VISIBLE_H; y++) {
+        for (int x = OFFSET_X; x < OFFSET_X + VISIBLE_W; x++) {
+            if (getMaskPixel(x, y, type)) display.drawPixel(x, y, GxEPD_WHITE);
+        }
+    }
+}
+
+// [用于全屏前置]：在白底上画黑纹
+void drawPatternWash(EffectType type) {
+    display.fillScreen(GxEPD_WHITE);
+    for (int y = OFFSET_Y; y < OFFSET_Y + VISIBLE_H; y++) {
+        for (int x = OFFSET_X; x < OFFSET_X + VISIBLE_W; x++) {
+            if (getMaskPixel(x, y, type)) display.drawPixel(x, y, GxEPD_BLACK);
+        }
+    }
+}
+
+// ==========================================
+// 4. 核心渲染器 (极速版)
+// ==========================================
+
+// [FAST] 极速直出 (No Animation)
+void runFast(int num) {
+    display.setPartialWindow(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H);
+    display.firstPage();
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "FAST");
+    } while (display.nextPage());
+}
+
+// [FLICKER] 纯白擦除 (No Animation)
+// 修正：彻底移除任何动效，只有 "擦" 和 "写"
+void runFlicker(int num) {
+    display.setPartialWindow(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H);
+    
+    // 1. Wipe (物理擦除)
+    display.firstPage(); do { display.fillScreen(GxEPD_WHITE); } while (display.nextPage());
+
+    // 2. Draw (物理写入)
+    display.firstPage();
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "FLICKER");
+    } while (display.nextPage());
+}
+
+// [LIGHT] 轻度全刷 (极速 0 延时)
+// 流程：全屏纹理 -> 黑 -> 白 -> 字体显影 -> 实心
+void runLight(int num) {
+    // 模拟全刷范围
+    display.setPartialWindow(0, 0, display.width(), display.height());
+
+    // 1. 前置缓冲 (全屏纹理)
+    display.firstPage(); do { drawPatternWash(TARGET_EFFECT); } while (display.nextPage());
+
+    // 2. 闪洗 (无延时)
+    display.firstPage(); do { display.fillScreen(GxEPD_BLACK); } while (display.nextPage());
+    display.firstPage(); do { display.fillScreen(GxEPD_WHITE); } while (display.nextPage());
+
+    // 3. 字体显影 (Phantom)
+    display.firstPage(); 
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "LIGHT");
+        applyTextureMask(TARGET_EFFECT);
+    } while (display.nextPage());
+
+    // 4. 定格 (Solid)
+    display.firstPage(); 
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "LIGHT");
+    } while (display.nextPage());
+}
+
+// [DEEP] 深度清洗 (极速 0 延时)
+// 流程：全屏纹理 -> 白 -> 黑 -> 白 -> 字体显影 -> 实心 -> 断电
+void runDeep(int num) {
+    display.setPartialWindow(0, 0, display.width(), display.height());
+
+    // 1. 前置缓冲
+    display.firstPage(); do { drawPatternWash(TARGET_EFFECT); } while (display.nextPage());
+
+    // 2. 强力洗 (无延时，全速 SPI)
+    display.firstPage(); do { display.fillScreen(GxEPD_WHITE); } while (display.nextPage());
+    display.firstPage(); do { display.fillScreen(GxEPD_BLACK); } while (display.nextPage());
+    display.firstPage(); do { display.fillScreen(GxEPD_WHITE); } while (display.nextPage());
+
+    // 3. 字体显影
+    display.firstPage(); 
+    do {
+        display.fillScreen(GxEPD_WHITE);
+        drawContent(num, "DEEP");
+        applyTextureMask(TARGET_EFFECT);
+    } while (display.nextPage());
+
+    // 4. 定格 & 加固 (连续刷入，不等待)
+    for(int i=0; i<2; i++) {
+        display.firstPage(); 
+        do {
+            display.fillScreen(GxEPD_WHITE);
+            drawContent(num, "DEEP");
+        } while (display.nextPage());
+    }
+    
+    // 5. 物理断电 (这是唯一必须做的硬件动作)
+    display.powerOff();
+}
+
+void loop() {
+    RefreshMode ref = (RefreshMode)currentRefreshIdx;
+    
+    Serial.printf("Frame %d | Mode: %d | Effect: %d\n", frameCount, ref, TARGET_EFFECT);
+
+    switch(ref) {
+        case REF_FAST:    runFast(frameCount);    break;
+        case REF_FLICKER: runFlicker(frameCount); break;
+        case REF_LIGHT:   runLight(frameCount);   break;
+        case REF_DEEP:    runDeep(frameCount);    break;
+    }
+
+    // 观察延时 (只为眼睛能看清，实际生产中可以去掉)
+    int wait = 1000;
+    if (ref == REF_DEEP) wait = 2000;
+    delay(wait);
+
+    currentRefreshIdx++;
+    if (currentRefreshIdx >= _REF_COUNT) {
+        currentRefreshIdx = 0;
+        Serial.println(">>> RESTART LOOP >>>");
+    }
+
+    frameCount++;
+    if(frameCount > 999) frameCount = 0;
+}
