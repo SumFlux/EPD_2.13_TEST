@@ -1,4 +1,5 @@
 #include "Driver/EPD_Driver.h"
+#include "Utils/Logger.h"
 
 // Constructor using the pin definitions from PinConfig.h
 EPD_Driver::EPD_Driver()
@@ -104,7 +105,140 @@ void EPD_Driver::drawStaticLabels(const char *ver) {
 }
 
 // ==========================================
-// Refresh Modes
+// 刷新 API 实现 (参考 il3879epdfullrefresh.txt)
+// ==========================================
+
+/**
+ * refreshPartial - 极速直出 (对应 FAST)
+ * 无闪烁，最快，适合数字跳变、菜单选择
+ * 每 5 次自动触发 refreshFlicker 消除残影
+ */
+void EPD_Driver::refreshPartial(DrawCallback drawFunc, int16_t x, int16_t y,
+                                int16_t w, int16_t h) {
+  _partialRefreshCount++;
+
+  if (_partialRefreshCount >= PARTIAL_REFRESH_THRESHOLD) {
+    LOG_DEBUG("[EPD] Auto flicker (5 partial reached)");
+    _partialRefreshCount = 0;
+
+    // 自动切换到 Flicker 模式消除残影
+    refreshFlicker(drawFunc);
+  } else {
+    LOG_PRINTF("[EPD] Partial (%d/%d)\n", _partialRefreshCount,
+               PARTIAL_REFRESH_THRESHOLD);
+
+    // 直接局刷
+    display.setPartialWindow(x, y, w, h);
+    display.firstPage();
+    do {
+      drawFunc(display);
+    } while (display.nextPage());
+  }
+}
+
+/**
+ * refreshFlicker - 局部擦白+写入 (对应 FLICKER)
+ * 闪1次，消除一般残影，仍使用 setPartialWindow
+ */
+void EPD_Driver::refreshFlicker(DrawCallback drawFunc) {
+  _partialRefreshCount = 0;
+  LOG_DEBUG("[EPD] Flicker");
+
+  display.setPartialWindow(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H);
+
+  // 1. 擦白 (Wipe)
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+  } while (display.nextPage());
+
+  // 2. 写入内容 (Draw)
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+    drawFunc(display);
+  } while (display.nextPage());
+}
+
+/**
+ * refreshFull - 全屏黑白清洗 (对应 LIGHT)
+ * 闪2次 (黑→白)，适合切换卡片、场景切换
+ */
+void EPD_Driver::refreshFull(DrawCallback drawFunc) {
+  _partialRefreshCount = 0;
+  LOG_DEBUG("[EPD] Full");
+
+  // 使用全屏局刷窗口 (不触发硬件全刷命令)
+  display.setPartialWindow(0, 0, display.width(), display.height());
+
+  // 1. 闪黑
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_BLACK);
+  } while (display.nextPage());
+
+  // 2. 闪白
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+  } while (display.nextPage());
+
+  // 3. 绘制内容
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+    drawFunc(display);
+  } while (display.nextPage());
+}
+
+/**
+ * refreshDeep - 深度强力清洗 (对应 DEEP)
+ * 闪3次 (白→黑→白)，最慢，用于开机初始化、刷图片、休眠前
+ */
+void EPD_Driver::refreshDeep(DrawCallback drawFunc) {
+  _partialRefreshCount = 0;
+  LOG_DEBUG("[EPD] Deep");
+
+  display.setPartialWindow(0, 0, display.width(), display.height());
+
+  // 1. 白
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+  } while (display.nextPage());
+
+  // 2. 黑
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_BLACK);
+  } while (display.nextPage());
+
+  // 3. 白
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+  } while (display.nextPage());
+
+  // 4. 绘制内容
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+    drawFunc(display);
+  } while (display.nextPage());
+
+  // 5. 加固一次
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+    drawFunc(display);
+  } while (display.nextPage());
+
+  // 6. 断电 (保护屏幕)
+  display.powerOff();
+}
+
+// ==========================================
+// 旧 API: 保留兼容性
 // ==========================================
 
 void EPD_Driver::runFast(int num) {

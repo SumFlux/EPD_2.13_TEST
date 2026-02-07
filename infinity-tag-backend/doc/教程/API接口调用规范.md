@@ -74,8 +74,8 @@ Authorization: Bearer <your_access_token>
 **请求参数**:
 ```json
 {
-  "device_id": "ABC123",  // 可选，不提供则自动生成6位短码
-  "password": "your_password"  // 必填，用户设置的密码（最少6位）
+  "device_code": "ABC123",  // 可选，不提供则自动生成6位短码
+  "init_password": "your_password"  // 必填，用户设置的密码（最少6位）
 }
 ```
 
@@ -101,7 +101,7 @@ Authorization: Bearer <your_access_token>
 **请求参数**:
 ```json
 {
-  "device_id": "ABC123",
+  "device_code": "ABC123",
   "password": "your_password"
 }
 ```

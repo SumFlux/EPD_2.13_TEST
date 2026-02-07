@@ -1,4 +1,5 @@
 #include "Input/InputManager.h"
+#include "Utils/Logger.h"
 
 // ==========================================
 // Static State Variables (for ISRs)
@@ -85,6 +86,90 @@ void InputManager::begin() {
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_B), encoderISR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_BTN), buttonISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(PIN_SW_KEY), vibrationISR, FALLING);
+
+  // 初始化长按和三击检测
+  _buttonDown = false;
+  _buttonDownTime = 0;
+  _longPressTriggered = false;
+  _lastClickTime = 0;
+  _clickCount = 0;
+}
+
+void InputManager::update(EventQueue &eventQueue) {
+  // 1. 检测编码器旋转
+  int8_t delta = getEncoderDelta();
+  if (delta != 0) {
+    Event event(EVENT_ENCODER_ROTATE, delta);
+    eventQueue.push(event);
+  }
+
+  // 2. 检测按钮状态
+  bool btnPressed = isButtonPressed();
+  bool btnDown = (digitalRead(PIN_ENC_BTN) == LOW);
+
+  if (btnPressed) {
+    // 按钮按下
+    _buttonDown = true;
+    _buttonDownTime = millis();
+    _longPressTriggered = false;
+
+    Event event(EVENT_BUTTON_PRESS);
+    eventQueue.push(event);
+
+    // 检测三击
+    _checkTripleClick(eventQueue);
+  }
+
+  if (_buttonDown && !btnDown) {
+    // 按钮松开
+    _buttonDown = false;
+
+    Event event(EVENT_BUTTON_RELEASE);
+    eventQueue.push(event);
+  }
+
+  // 3. 检测长按
+  if (_buttonDown && !_longPressTriggered) {
+    _checkLongPress(eventQueue);
+  }
+
+  // 4. 检测振动
+  if (isVibrationTriggered()) {
+    Event event(EVENT_VIBRATION);
+    eventQueue.push(event);
+  }
+}
+
+void InputManager::_checkLongPress(EventQueue &eventQueue) {
+  if (millis() - _buttonDownTime >= LONG_PRESS_DURATION) {
+    _longPressTriggered = true;
+
+    Event event(EVENT_BUTTON_LONG_PRESS);
+    eventQueue.push(event);
+
+    LOG_DEBUG("[InputManager] Long press detected");
+  }
+}
+
+void InputManager::_checkTripleClick(EventQueue &eventQueue) {
+  uint32_t now = millis();
+
+  if (now - _lastClickTime < CLICK_INTERVAL) {
+    _clickCount++;
+    if (_clickCount >= 3) {
+      // 三击触发
+      Event event(EVENT_BUTTON_TRIPLE_CLICK);
+      eventQueue.push(event);
+
+      LOG_DEBUG("[InputManager] Triple click detected");
+
+      _clickCount = 0;
+    }
+  } else {
+    _clickCount = 1;
+  }
+
+  _lastClickTime = now;
 }
 
 int8_t InputManager::getEncoderDelta() {

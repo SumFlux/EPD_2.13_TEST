@@ -27,7 +27,10 @@
       "Bash(\"venv/Scripts/pip\" install:*)",
       "Bash(tree:*)",
       "Bash(ruff check:*)",
-      "Bash(iconv:*)"
+      "Bash(iconv:*)",
+      "Bash(ls:*)",
+      "Bash(pio run)",
+      "Bash(dir:*)"
     ]
   },
   "enabledPlugins": {

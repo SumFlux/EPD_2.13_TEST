@@ -1,123 +1,177 @@
 #include "Driver/EPD_Driver.h"
 #include "Input/InputManager.h"
-#include "Network/ImageFetcher.h"
 #include "Network/NetworkManager.h"
 #include "PinConfig.h"
+#include "Utils/ChineseFont.h"
 #include "Version.h"
+
+// 核心框架
+#include "Core/Card.h"
+#include "Core/CardManager.h"
+#include "Core/ConfigManager.h"
+#include "Core/Event.h"
+#include "Core/EventQueue.h"
+#include "Core/StatusBar.h"
+
+// 网络
+#include "Network/OTAManager.h"
+#include "Network/WiFiProvisioning.h"
+
+// 卡片
+#include "Cards/SettingsCard.h"
+
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <esp_task_wdt.h>
+#include <memory>
 
 // ==========================================
-// Configuration (硬编码调试用)
-// ==========================================
-#define WIFI_SSID "SumHome"
-#define WIFI_PASSWORD "94449999"
-#define API_BASE_URL "http://192.168.31.57:8001"
-#define DEVICE_ID "0BFB78"
-#define DEVICE_PASSWORD "123456"
-
-// ==========================================
-// Objects
+// 全局对象
 // ==========================================
 EPD_Driver epd;
 InputManager input;
 NetworkManager network;
-ImageFetcher imageFetcher(API_BASE_URL);
+ConfigManager config;
+StatusBar statusBar;
+EventQueue eventQueue;
+
+std::unique_ptr<CardManager> cardManager;
+
+// 网络工具
+std::unique_ptr<WiFiProvisioning> wifiProvisioning;
+std::unique_ptr<OTAManager> otaManager;
+
+// 卡片对象
+std::unique_ptr<SettingsCard> settingsCard;
 
 // ==========================================
-// State
+// 状态变量
 // ==========================================
-int g_encCounter = 0;
-int g_vibCounter = 0;
-char g_versionStr[32];
-
-// Network & Image State
-static uint8_t *g_bitmapBuffer = nullptr;
-static const size_t BITMAP_SIZE = 2808; // Row-aligned: 27 bytes/row * 104 rows
-static std::vector<ImageInfo> g_imageList;
-static int g_currentImageIndex = -1;
-static bool g_systemReady = false;
+bool g_systemReady = false;
+bool g_wifiConnected = false;
+int g_batteryLevel = 5; // 0-5段显示
 
 // ==========================================
-// Helper Functions
+// 辅助函数
 // ==========================================
 
 void displayProgress(const char *message, int step, int total) {
-  epd.getDisplay().setPartialWindow(0, 0, 212, 104);
-  epd.getDisplay().firstPage();
-  do {
-    epd.getDisplay().fillScreen(GxEPD_WHITE);
-    epd.getDisplay().setTextColor(GxEPD_BLACK);
-    epd.getDisplay().setTextSize(2);
-    epd.getDisplay().setCursor(10, 28);
-    epd.getDisplay().print("Starting...");
+  int progress = (step * 180) / total; // barWidth = 180
+
+  epd.refreshPartial([message, step, total, progress](EPD_Class &d) {
+    d.fillScreen(GxEPD_WHITE);
+    d.setTextColor(GxEPD_BLACK);
+
+    // 标题（使用中文字体）
+    ChineseFont::drawString(d, 10, 28, "启动中", GxEPD_BLACK);
 
     int barWidth = 180;
     int barHeight = 20;
     int barX = 16;
     int barY = 58;
-    int progress = (step * barWidth) / total;
 
-    epd.getDisplay().drawRect(barX, barY, barWidth, barHeight, GxEPD_BLACK);
-    epd.getDisplay().fillRect(barX + 2, barY + 2, progress - 4, barHeight - 4,
-                              GxEPD_BLACK);
+    d.drawRect(barX, barY, barWidth, barHeight, GxEPD_BLACK);
+    d.fillRect(barX + 2, barY + 2, progress - 4, barHeight - 4, GxEPD_BLACK);
 
-    epd.getDisplay().setTextSize(1);
-    epd.getDisplay().setCursor(10, 88);
-    epd.getDisplay().print("Step ");
-    epd.getDisplay().print(step);
-    epd.getDisplay().print("/");
-    epd.getDisplay().print(total);
+    d.setTextSize(1);
+    ChineseFont::drawString(d, 10, 88, "步骤 ", GxEPD_BLACK);
+    d.setCursor(46, 90);
+    d.print(step);
+    d.print("/");
+    d.print(total);
 
-    epd.getDisplay().setCursor(10, 98); // 改为 98，原来 103 超出可见区域
-    epd.getDisplay().print(message);
-  } while (epd.getDisplay().nextPage());
+    // 状态文字（使用中文字体）
+    ChineseFont::drawString(d, 10, 100, message, GxEPD_BLACK);
+  });
 }
 
 void displayError(const char *message) {
   Serial.print("Error: ");
   Serial.println(message);
 
-  epd.runLight(0);
-  epd.getDisplay().setFullWindow();
-  epd.getDisplay().firstPage();
-  do {
-    epd.getDisplay().fillScreen(GxEPD_WHITE);
-    epd.getDisplay().setTextColor(GxEPD_BLACK);
-    epd.getDisplay().setTextSize(2);
-    epd.getDisplay().setCursor(10, 58); // 40 + 18 (OFFSET_Y)
-    epd.getDisplay().print("Error:");
-    epd.getDisplay().setCursor(10, 78); // 60 + 18 (OFFSET_Y)
-    epd.getDisplay().print(message);
-  } while (epd.getDisplay().nextPage());
+  epd.refreshFull([message](EPD_Class &d) {
+    d.fillScreen(GxEPD_WHITE);
+    d.setTextColor(GxEPD_BLACK);
+
+    // 使用中文字体
+    ChineseFont::drawString(d, 10, 58, "错误:", GxEPD_BLACK);
+    d.setTextSize(1);
+    d.setCursor(10, 80);
+    d.print(message);
+  });
 }
 
-bool fetchAndDisplayImage(int imageIndex) {
-  if (imageIndex < 0 || static_cast<size_t>(imageIndex) >= g_imageList.size()) {
-    Serial.println("Error: Invalid image index");
+bool initLittleFS() {
+  Serial.println("[LittleFS] Initializing...");
+
+  if (!LittleFS.begin(true)) {
+    Serial.println("[LittleFS] ERROR: Failed to mount");
     return false;
   }
 
-  ImageInfo &img = g_imageList[imageIndex];
+  Serial.println("[LittleFS] Mounted successfully");
 
-  Serial.print("Downloading image ID: ");
-  Serial.print(img.id);
-  Serial.print(", URL: ");
-  Serial.println(img.url);
+  // 显示文件系统信息
+  size_t totalBytes = LittleFS.totalBytes();
+  size_t usedBytes = LittleFS.usedBytes();
+  Serial.printf("[LittleFS] Total: %d bytes, Used: %d bytes\n", totalBytes,
+                usedBytes);
 
-  if (!imageFetcher.downloadBitmap(img.id, g_bitmapBuffer, BITMAP_SIZE)) {
-    Serial.println("ERROR: downloadBitmap() failed!");
-    displayError("Download Failed");
-    return false;
-  }
-
-  Serial.println("Download successful, displaying bitmap...");
-  bool useFlicker = (g_currentImageIndex != -1);
-  epd.drawBitmap(g_bitmapBuffer, BITMAP_SIZE, useFlicker);
-
-  g_currentImageIndex = imageIndex;
-  Serial.println("Image displayed successfully");
   return true;
+}
+
+bool connectWiFi() {
+  String ssid = config.getWiFiSSID();
+  String password = config.getWiFiPassword();
+
+  if (ssid.isEmpty()) {
+    Serial.println("[WiFi] No WiFi config found");
+    return false;
+  }
+
+  Serial.printf("[WiFi] Connecting to: %s\n", ssid.c_str());
+
+  // 配置WiFi
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(WIFI_PS_NONE);
+  WiFi.setAutoReconnect(true);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  delay(500);
+
+  // 连接WiFi
+  network.begin(ssid.c_str(), password.c_str());
+
+  if (!network.waitForConnection(15000)) {
+    Serial.println("[WiFi] Connection failed");
+    return false;
+  }
+
+  Serial.println("[WiFi] Connected successfully");
+  Serial.printf("[WiFi] IP: %s\n", WiFi.localIP().toString().c_str());
+
+  return true;
+}
+
+void initCards() {
+  Serial.println("[Cards] Initializing cards...");
+
+  // 创建WiFi配网工具
+  wifiProvisioning =
+      std::unique_ptr<WiFiProvisioning>(new WiFiProvisioning(epd, config));
+
+  // 创建OTA管理器
+  otaManager = std::unique_ptr<OTAManager>(new OTAManager(epd, config));
+
+  // 创建设置卡片
+  settingsCard = std::unique_ptr<SettingsCard>(
+      new SettingsCard(epd, config, *wifiProvisioning, *otaManager));
+  cardManager->registerCard(settingsCard.get());
+
+  // TODO: 加载Lua卡片
+
+  Serial.printf("[Cards] Registered %d cards\n", cardManager->getCardCount());
 }
 
 // ==========================================
@@ -133,122 +187,139 @@ void setup() {
   delay(100);
 
   // 配置 Task Watchdog Timer (30秒超时)
-  // 兼容 ESP32 Arduino Core 2.x API: esp_task_wdt_init(timeout_seconds, panic)
   esp_task_wdt_deinit();
-  esp_task_wdt_init(30, true); // 30秒超时，触发 panic (自动重启)
-  esp_task_wdt_add(NULL);      // 注册当前任务
+  esp_task_wdt_init(30, true);
+  esp_task_wdt_add(NULL);
 
   Serial.begin(115200);
   delay(500);
 
-  Serial.println("--- INFINITY TAG V2 (Network) ---");
+  Serial.println("========================================");
+  Serial.println("  INFINITY TAG V2 - Lua Card Engine");
+  Serial.println("========================================");
   Serial.println("[CRITICAL] PWR_IO set to HIGH - Power hold enabled");
 
-  snprintf(g_versionStr, sizeof(g_versionStr), "Firmware: v%d.%d.%d.%d",
+  char versionStr[64];
+  snprintf(versionStr, sizeof(versionStr), "Firmware: v%d.%d.%d.%d",
            VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_BUILD);
-  Serial.println(g_versionStr);
+  Serial.println(versionStr);
 
-  // Step 1: Init hardware
+  // Step 1: 初始化硬件
+  displayProgress("初始化硬件", 1, 6);
   epd.begin();
   input.begin();
-  displayProgress("Init hardware...", 1, 5);
   Serial.println("[OK] Hardware initialized");
 
-  // Step 2: Allocate memory (带内存安全检查)
-  displayProgress("Allocate memory...", 2, 5);
-
-  // 安全检查：释放旧内存（防止重复调用 setup 时内存泄漏）
-  if (g_bitmapBuffer != nullptr) {
-    free(g_bitmapBuffer);
-    g_bitmapBuffer = nullptr;
-    Serial.println("[WARN] Freed existing bitmap buffer");
-  }
-
-  // 分配新内存
-  if (psramFound()) {
-    g_bitmapBuffer = (uint8_t *)ps_malloc(BITMAP_SIZE);
-    Serial.printf("[INFO] Allocated %d bytes from PSRAM\n", BITMAP_SIZE);
-  } else {
-    g_bitmapBuffer = (uint8_t *)malloc(BITMAP_SIZE);
-    Serial.printf("[INFO] Allocated %d bytes from internal RAM\n", BITMAP_SIZE);
-  }
-
-  if (g_bitmapBuffer == nullptr) {
-    displayError("Memory Error");
-    Serial.println("[FATAL] Failed to allocate bitmap buffer!");
+  // Step 2: 初始化LittleFS
+  displayProgress("初始化文件系统", 2, 6);
+  if (!initLittleFS()) {
+    displayError("文件系统失败");
     while (1) {
-      esp_task_wdt_reset(); // 保持喂狗，但停止运行
+      esp_task_wdt_reset();
       delay(1000);
     }
   }
-  Serial.println("[OK] Memory allocated");
+  Serial.println("[OK] LittleFS initialized");
 
-  // Step 3: 显示准备 WiFi，然后让墨水屏休眠
-  displayProgress("Prepare WiFi...", 3, 5);
-  delay(1000);
+  // Step 3: 初始化配置管理器
+  displayProgress("加载配置", 3, 6);
+  if (!config.begin()) {
+    displayError("配置加载失败");
+    while (1) {
+      esp_task_wdt_reset();
+      delay(1000);
+    }
+  }
+  Serial.println("[OK] Config loaded");
 
-  Serial.println("Hibernating EPD for WiFi...");
+  // Step 4: 初始化核心组件
+  displayProgress("初始化核心", 4, 6);
+  statusBar.begin();
+  cardManager = std::unique_ptr<CardManager>(new CardManager(epd, statusBar));
+  cardManager->begin();
+  Serial.println("[OK] Core initialized");
+
+  // Step 5: 初始化卡片
+  displayProgress("加载卡片", 5, 6);
+  initCards();
+  Serial.println("[OK] Cards loaded");
+
+  // Step 6: 检查WiFi配置
+  displayProgress("检查网络", 6, 6);
+
+  if (config.isFirstBoot() || !config.hasWiFiConfig()) {
+    Serial.println("[Setup] First boot or no WiFi config - entering settings");
+
+    // 进入设置卡片（会自动进入配网模式）
+    cardManager->setCurrentCard(0);
+    g_systemReady = true;
+
+    Serial.println("========================================");
+    Serial.println("  SYSTEM READY (First Boot)");
+    Serial.println("========================================");
+    return;
+  }
+
+  // 尝试连接WiFi
   epd.hibernate();
-  delay(1000);
-
-  // 配置 WiFi（低功率模式）
-  Serial.println("Configuring WiFi...");
-  WiFi.disconnect(true);
-  delay(100);
-  WiFi.mode(WIFI_STA);
-  WiFi.setSleep(WIFI_PS_NONE);
-  WiFi.setAutoReconnect(false);
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   delay(500);
 
-  Serial.println("Connecting to WiFi...");
-  network.begin(WIFI_SSID, WIFI_PASSWORD);
+  g_wifiConnected = connectWiFi();
 
-  if (!network.waitForConnection(30000)) {
-    epd.begin();
-    displayError("WiFi Failed");
-    g_systemReady = false;
-    Serial.println("--- READY (No Network) ---");
-    return;
-  }
-  Serial.println("[OK] WiFi connected");
-
-  // Step 4: Authenticate
-  Serial.println("Authenticating...");
-  if (!imageFetcher.authenticate(DEVICE_ID, DEVICE_PASSWORD)) {
-    epd.begin();
-    displayError("Auth Failed");
-    g_systemReady = false;
-    Serial.println("--- READY (No Auth) ---");
-    return;
-  }
-  Serial.println("[OK] Authenticated");
-
-  // Step 5: 重新唤醒墨水屏，显示就绪
   epd.begin();
-  displayProgress("Ready!", 5, 5);
-  delay(1000);
+  delay(500);
+
+  if (!g_wifiConnected) {
+    Serial.println("[Setup] WiFi connection failed - offline mode");
+  }
+
+  // 显示就绪信息
+  bool wifiStatus = g_wifiConnected;
+  int cardCount = cardManager->getCardCount();
+  String ipAddr = wifiStatus ? WiFi.localIP().toString() : "";
+
+  epd.refreshFull([wifiStatus, cardCount, ipAddr](EPD_Class &d) {
+    d.fillScreen(GxEPD_WHITE);
+    d.setTextColor(GxEPD_BLACK);
+
+    // 标题（使用中文字体）
+    ChineseFont::drawString(d, 10, 58, "系统就绪", GxEPD_BLACK);
+
+    d.setTextSize(1);
+    if (wifiStatus) {
+      d.setCursor(10, 78);
+      d.print("WiFi: ");
+      d.print(ipAddr);
+    } else {
+      ChineseFont::drawString(d, 10, 78, "WiFi: 离线", GxEPD_BLACK);
+    }
+
+    ChineseFont::drawString(d, 10, 98, "卡片: ", GxEPD_BLACK);
+    d.setCursor(58, 100);
+    d.print(cardCount);
+  });
+
+  delay(2000);
+
+  // 设置默认卡片（如果有卡片的话）
+  if (cardManager->getCardCount() > 0) {
+    // 从配置中读取上次选中的卡片索引
+    int lastCardIndex = config.getCurrentCardIndex();
+    if (lastCardIndex >= 0 && lastCardIndex < cardManager->getCardCount()) {
+      cardManager->setCurrentCard(lastCardIndex);
+    } else {
+      // 默认选择第一张卡片
+      cardManager->setCurrentCard(0);
+    }
+    Serial.printf("[Setup] Set current card to index: %d\n",
+                  cardManager->getCurrentCardIndex());
+  }
 
   g_systemReady = true;
-  Serial.println("--- SYSTEM READY ---");
 
-  // Display ready message
-  epd.runLight(0);
-  epd.getDisplay().setFullWindow();
-  epd.getDisplay().firstPage();
-  do {
-    epd.getDisplay().fillScreen(GxEPD_WHITE);
-    epd.getDisplay().setTextColor(GxEPD_BLACK);
-    epd.getDisplay().setTextSize(2);
-    epd.getDisplay().setCursor(10, 58); // 40 + 18 (OFFSET_Y)
-    epd.getDisplay().print("System Ready");
-    epd.getDisplay().setTextSize(1);
-    epd.getDisplay().setCursor(10, 88); // 70 + 18 (OFFSET_Y)
-    epd.getDisplay().print("WiFi: ");
-    epd.getDisplay().print(WiFi.localIP().toString());
-    epd.getDisplay().setCursor(10, 100); // 82 + 18 (OFFSET_Y)
-    epd.getDisplay().print("Press button");
-  } while (epd.getDisplay().nextPage());
+  Serial.println("========================================");
+  Serial.println("  SYSTEM READY");
+  Serial.println("========================================");
 }
 
 // ==========================================
@@ -256,77 +327,33 @@ void setup() {
 // ==========================================
 
 void loop() {
-  int8_t delta = input.getEncoderDelta();
-  bool vibe = input.isVibrationTriggered();
-  bool btn = input.isButtonPressed();
-
-  // Button: Fetch images
-  if (btn) {
-    Serial.println("[BTN] Fetch images");
-
-    if (!g_systemReady) {
-      displayError("System Not Ready");
-      delay(2000);
-      return;
-    }
-
-    if (!network.isConnected()) {
-      displayError("WiFi Disconnected");
-      delay(2000);
-      return;
-    }
-
-    if (!imageFetcher.fetchImageList(g_imageList)) {
-      displayError("Fetch Failed");
-      delay(2000);
-      return;
-    }
-
-    if (g_imageList.empty()) {
-      displayError("No Images");
-      delay(2000);
-      return;
-    }
-
-    if (fetchAndDisplayImage(0)) {
-      Serial.println("First image displayed");
-    }
-
-    delay(500);
+  if (!g_systemReady) {
+    esp_task_wdt_reset();
+    delay(100);
     return;
   }
 
-  // Encoder: Switch images
-  if (delta != 0 && !g_imageList.empty()) {
-    Serial.print("[ENC] Switch image: ");
-
-    int newIndex = g_currentImageIndex + delta;
-
-    if (newIndex < 0) {
-      newIndex = g_imageList.size() - 1;
-    } else if (newIndex >= static_cast<int>(g_imageList.size())) {
-      newIndex = 0;
-    }
-
-    Serial.println(newIndex);
-
-    if (fetchAndDisplayImage(newIndex)) {
-      Serial.println("Image switched");
-    }
-
-    delay(200);
-    return;
+  // 1. 如果设置卡片正在配网，处理DNS和Web请求
+  if (settingsCard && cardManager->getCurrentCardIndex() == 0) {
+    settingsCard->update();
   }
 
-  // Vibration: Counter
-  if (vibe) {
-    g_vibCounter++;
-    if (g_vibCounter > 99)
-      g_vibCounter = 0;
-    Serial.printf("[VIB] %d\n", g_vibCounter);
-  }
+  // 2. 更新输入状态并产生事件
+  input.update(eventQueue);
 
-  // 定期喂狗，防止看门狗超时重启
+  // 3. 处理事件队列
+  cardManager->processEvents(eventQueue);
+
+  // 4. 更新WiFi连接状态
+  g_wifiConnected = network.isConnected();
+
+  // 5. 更新电池电量（TODO: 实现电池电量检测）
+  // g_batteryLevel = readBatteryLevel();
+
+  // 6. 渲染当前卡片和状态栏
+  // cardManager->render(g_wifiConnected, g_batteryLevel);
+
+  // 7. 喂狗
   esp_task_wdt_reset();
 
   delay(10);

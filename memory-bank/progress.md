@@ -1,6 +1,6 @@
 # 项目进度记录
 
-> 最后更新: 2026-02-03
+> 最后更新: 2026-02-07
 
 ## 当前版本
 
@@ -12,6 +12,28 @@
 
 ### 2026-02-07
 
+- [x] **OTA 固件升级调试完成**:
+    - **后端鉴权集成**: 恢复 `Depends(get_current_user)`，ESP32 实现设备登录 (`_login`) 获取 Token.
+    - **接口参数修正**: 修正登录接口 (`device_id` -> `device_code`) 及 OTA Check 接口 (`version` -> `latest_version`, `url` -> `download_url`).
+    - **版本号算法**: 升级版本比较逻辑，支持 Major.Minor.Patch.Build (4位) 比较.
+    - **稳定性优化**: 解决下载过程触发 Task WDT 复位问题 (EPD 刷新率降低至 10%，循环中添加 `vTaskDelay(1)`).
+    - **验证通过**: 成功从 v1.0.0.6 OTA 升级至 v1.0.0.7.
+
+- [x] **EPD 刷新 API 重构** (2026-02-07)
+  - [x] 实现回调式刷新接口 (`refreshPartial`, `refreshFull` 等)
+  - [x] 迁移所有业务模块 (`main`, `SettingsCard`, `OTAManager` 等)
+  - [x] 实现自动全刷策略 (每 5 次局部刷新触发一次消除残影)
+  - [x] **中文字体支持** (2026-02-08)
+  - [x] 集成 `U8g2_for_Adafruit_GFX`
+  - [x] 实现 `ChineseFont` 工具类 (UTF-8 解码, 混排对齐)
+  - [x] 修复位图渲染逻辑 (12x12, 24字节/字, MSB-first)
+  - [x] 扩展字库覆盖所有 UI 文本 (250+ 字符)
+  - [x] 解决链接错误 (`static inline findChineseBitmap`)
+  - [x] 统一坐标系统 (左上角原点)，修复 UI 重叠
+- [x] **代码质量优化** (2026-02-08)
+  - [x] 修复 `main.cpp` 内存泄漏风险 (使用 `std::unique_ptr`)
+  - [x] 修复 `InputManager` 数组越界风险 (三击检测 `_clickCount >= 3`)
+  - [x] 优化调试输出 (引入 `Logger.h` 宏控制)
 - [x] **位图格式修正**: 
     - 确认并修复位图数据格式为 **2808 字节 (行对齐)**，而非之前的 2756 字节 (紧密打包)
     - 更新后端 `renderer_service.py` 图像转换逻辑

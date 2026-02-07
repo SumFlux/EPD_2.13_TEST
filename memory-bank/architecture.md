@@ -1,6 +1,6 @@
 # 项目架构文档
 
-> 最后更新: 2026-02-06
+> 最后更新: 2026-02-07
 # ... (omitting header changes to save space)
 
 ### 3. 震动交互 (Shake Action)
@@ -12,11 +12,16 @@
 | **触发阈值** | Count >= 6 | 需检测到6次脉冲才视为"摇晃" |
 | **防连击** | Cooldown = 500ms | 触发后暂定响应，防止数字跳变 |
 
-### 4. 刷新策略
+### 4. EPD 刷新策略 (Callback API)
 
-```
-普通局刷 → 每3次闪白 → 每20次深度恢复
-```
+| 方法 | 刷新区域 | 闪烁 | 速度 | 用途 |
+|------|----------|------|------|------|
+| `refreshPartial` | 局部可变 | 无 | 快 | 数字跳变、菜单选择 |
+| `refreshFlicker` | 局部全屏 | 1次 | 中 | 每5次局刷后自动消除残影 |
+| `refreshFull` | 全屏 | 2次 | 中慢 | 切换卡片、场景切换 |
+| `refreshDeep` | 全屏 | 3次 | 慢 | 开机初始化、刷图片、休眠前 |
+
+**核心设计**: 所有模式均使用 `setPartialWindow` 实现，避免触发硬件全刷命令。自动策略: 每5次 `refreshPartial` 自动调用 `refreshFlicker`。
 
 ### 5. 版本管理
 
@@ -41,7 +46,12 @@
     - 固件上传验证: Admin Token + Checksum 计算
     - 固件下载验证: User/Device Token
     - API 请求验证: 关键业务 (如解字) 强制通过 `X-Signature`, `X-Timestamp` 进行 HMAC-SHA256 签名校验
+    - API 请求验证: 关键业务 (如解字) 强制通过 `X-Signature`, `X-Timestamp` 进行 HMAC-SHA256 签名校验
     - 脚本安全: 运维脚本 (`upload_firmware.py`) 采用本地 `.env` 配置签发 Token，避免明文密码传输
+    - **设备端 OTA 策略**:
+        - 登录获取 Token -> Check Update -> Download (带 Token Header)
+        - 下载过程中每 10% 刷新一次屏幕，防止看门狗超时 (WDT Reset)
+        - 强制 `vTaskDelay(1)` 让出 CPU 时间片
 
 ### 6. 前端架构 (Admin)
 
