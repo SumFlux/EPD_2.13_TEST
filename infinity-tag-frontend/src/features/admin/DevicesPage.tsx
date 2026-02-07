@@ -9,7 +9,7 @@ import { AdminHeader } from './AdminHeader'
 
 export function DevicesPage() {
   const navigate = useNavigate()
-  const { isAdminAuthenticated, devices, totalDevices, setDevices, adminLogout } = useAdminStore()
+  const { isAdminAuthenticated, devices, totalDevices, setDevices } = useAdminStore()
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>('')

@@ -14,7 +14,8 @@
 #define PIN_BUSY 8
 
 // Power Control
-#define PIN_POWER_EN 47
+#define PIN_POWER_EN 47 // EPD 电源使能
+#define PIN_PWR_IO 47   // 系统电源保持（HOLD POWER）- 必须保持 HIGH
 
 // Input Devices
 #define PIN_ENC_A 40
@@ -25,5 +26,19 @@
 // Display Constants
 #define EPD_WIDTH 212
 #define EPD_HEIGHT 104
+
+// ══════════════════════════════════════════════════════════════════════════
+// IMPORTANT: E-Paper Display Hardware Offset
+// ══════════════════════════════════════════════════════════════════════════
+// This 2.13" SSD1680 panel has a 250x122 GRAM, but only 212x104 is visible.
+// There is an 18-pixel vertical offset from GRAM origin to visible area.
+//
+// EPD_Driver.h defines: OFFSET_X = 0, OFFSET_Y = 18
+//
+// ★★★ CRITICAL: When implementing ANY display function, ALWAYS add     ★★★
+// ★★★ OFFSET_Y to all Y coordinates! Example:                          ★★★
+// ★★★   display.setCursor(x, y + OFFSET_Y);                             ★★★
+// ★★★   display.drawBitmap(OFFSET_X, OFFSET_Y, bitmap, w, h, color);    ★★★
+// ══════════════════════════════════════════════════════════════════════════
 
 #endif // PIN_CONFIG_H

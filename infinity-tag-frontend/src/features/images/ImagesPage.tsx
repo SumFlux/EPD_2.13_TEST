@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useImagesStore } from '@/stores'
 import { imagesApi } from '@/api'
-import type { ImageOptions } from '@/types'
+import type { ImageOptions, DitherAlgorithm } from '@/types'
+import { DITHER_ALGORITHMS } from '@/types'
 
 const MAX_IMAGES = 5
 
@@ -10,14 +11,18 @@ export default function ImagesPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isReordering, setIsReordering] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [options, setOptions] = useState<ImageOptions>({
     rotate: 0,
     invert: false,
-    dither: true,
+    dither_algorithm: 'atkinson',
     threshold: 128,
+    contrast: 1.3,
+    sharpness: 1.5,
+    gamma: 1.2,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const previewTimeoutRef = useRef<number>()
+  const previewTimeoutRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -186,11 +191,10 @@ export default function ImagesPage() {
                       <button
                         key={angle}
                         onClick={() => handleOptionChange('rotate', angle)}
-                        className={`px-3 py-1 rounded text-sm transition-colors ${
-                          options.rotate === angle
-                            ? 'bg-accent-primary text-text-primary'
-                            : 'bg-background-secondary text-text-secondary'
-                        }`}
+                        className={`px-3 py-1 rounded text-sm transition-colors ${options.rotate === angle
+                          ? 'bg-accent-primary text-text-primary'
+                          : 'bg-background-secondary text-text-secondary'
+                          }`}
                       >
                         {angle}°
                       </button>
@@ -209,33 +213,98 @@ export default function ImagesPage() {
                   <span className="text-sm">反色</span>
                 </label>
 
-                {/* 抖动/阈值 */}
+                {/* 抖动算法选择 */}
                 <div>
-                  <label className="flex items-center gap-2 cursor-pointer mb-2">
+                  <label className="block text-sm text-text-secondary mb-1">抖动算法</label>
+                  <select
+                    value={options.dither_algorithm}
+                    onChange={(e) => handleOptionChange('dither_algorithm', e.target.value as DitherAlgorithm)}
+                    className="w-full px-3 py-2 rounded bg-background-secondary text-text-primary border border-border"
+                  >
+                    {DITHER_ALGORITHMS.map((algo) => (
+                      <option key={algo.value} value={algo.value}>
+                        {algo.label} - {algo.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 阈值 (仅在 threshold 算法时显示) */}
+                {options.dither_algorithm === 'threshold' && (
+                  <div>
+                    <label className="block text-sm text-text-secondary mb-1">
+                      阈值: {options.threshold}
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={options.dither}
-                      onChange={(e) => handleOptionChange('dither', e.target.checked)}
-                      className="accent-accent-primary"
+                      type="range"
+                      min="0"
+                      max="255"
+                      value={options.threshold}
+                      onChange={(e) => handleOptionChange('threshold', Number(e.target.value))}
+                      className="w-full accent-accent-primary"
                     />
-                    <span className="text-sm">抖动算法（推荐）</span>
-                  </label>
-                  {!options.dither && (
+                  </div>
+                )}
+
+                {/* 高级选项折叠 */}
+                <button
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-sm text-accent-primary hover:underline"
+                >
+                  {showAdvanced ? '▼ 收起高级选项' : '▶ 展开高级选项'}
+                </button>
+
+                {showAdvanced && (
+                  <div className="space-y-3 p-3 bg-background-secondary rounded">
+                    {/* 对比度 */}
                     <div>
                       <label className="block text-sm text-text-secondary mb-1">
-                        阈值: {options.threshold}
+                        对比度: {options.contrast?.toFixed(1)}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="3.0"
+                        step="0.1"
+                        value={options.contrast}
+                        onChange={(e) => handleOptionChange('contrast', Number(e.target.value))}
+                        className="w-full accent-accent-primary"
+                      />
+                    </div>
+
+                    {/* 锐化 */}
+                    <div>
+                      <label className="block text-sm text-text-secondary mb-1">
+                        锐化: {options.sharpness?.toFixed(1)}
                       </label>
                       <input
                         type="range"
                         min="0"
-                        max="255"
-                        value={options.threshold}
-                        onChange={(e) => handleOptionChange('threshold', Number(e.target.value))}
+                        max="5.0"
+                        step="0.1"
+                        value={options.sharpness}
+                        onChange={(e) => handleOptionChange('sharpness', Number(e.target.value))}
                         className="w-full accent-accent-primary"
                       />
                     </div>
-                  )}
-                </div>
+
+                    {/* Gamma */}
+                    <div>
+                      <label className="block text-sm text-text-secondary mb-1">
+                        Gamma: {options.gamma?.toFixed(1)}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.3"
+                        max="3.0"
+                        step="0.1"
+                        value={options.gamma}
+                        onChange={(e) => handleOptionChange('gamma', Number(e.target.value))}
+                        className="w-full accent-accent-primary"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button

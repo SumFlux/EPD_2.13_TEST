@@ -8,7 +8,7 @@ import { AdminHeader } from './AdminHeader'
 
 export function UsersPage() {
   const navigate = useNavigate()
-  const { isAdminAuthenticated, users, totalUsers, setUsers, adminLogout } = useAdminStore()
+  const { isAdminAuthenticated, users, totalUsers, setUsers } = useAdminStore()
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
 

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAlmanacStore, useProfileStore } from '@/stores'
 import { almanacApi, profileApi } from '@/api'
 import { getEnergyColor, getEnergyLabel } from '@/utils'
@@ -12,7 +11,7 @@ const months = Array.from({ length: 12 }, (_, i) => i + 1)
 const days = Array.from({ length: 31 }, (_, i) => i + 1)
 
 export default function AlmanacPage() {
-  const navigate = useNavigate()
+  // Note: navigate unused, routing handled by app
   const { today, history, setToday, setHistory, isLoading, setLoading, error, setError } = useAlmanacStore()
   const { profile, setProfile } = useProfileStore()
   const [hasProfile, setHasProfile] = useState<boolean | null>(null)
@@ -75,7 +74,7 @@ export default function AlmanacPage() {
       } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number; data?: { detail?: string } } }
         if (axiosError.response?.status === 400 &&
-            axiosError.response?.data?.detail?.includes('档案')) {
+          axiosError.response?.data?.detail?.includes('档案')) {
           setHasProfile(false)
           setShowProfileForm(true)
         } else {

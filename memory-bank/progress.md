@@ -10,6 +10,24 @@
 
 ### 2026-02-04
 
+### 2026-02-07
+
+- [x] **位图格式修正**: 
+    - 确认并修复位图数据格式为 **2808 字节 (行对齐)**，而非之前的 2756 字节 (紧密打包)
+    - 更新后端 `renderer_service.py` 图像转换逻辑
+    - 同步更新所有测试脚本 (`test_api_bitmap.py`, `test_existing_image.py` 等)
+    - 修正相关文档说明 (`README.md`, `NETWORK_SETUP.md` 等)
+- [x] **高优先级缺陷修复**:
+    - `image_processing.py`: 添加空数据验证，捕获 PIL 异常，防止服务崩溃
+    - `image_processing.py`: 为抖动算法添加 `try-except` 处理（内存不足/计算错误）
+    - `main.cpp`: 优化看门狗 (WDT) 策略，使用 `esp_task_wdt_init(30, true)` 并定期喂狗，替代完全禁用
+- [x] **代码质量提升**:
+    - `image_processing.py`: 添加类型注解，将 Bayer 矩阵魔法数字替换为命名常量
+    - `main.cpp`: 添加内存重新分配前的释放检查，防止内存泄漏
+- [x] **编译兼容性修复**:
+    - `main.cpp`: 修正 WDT 初始化代码以兼容 ESP32 Arduino Core v2.x
+    - `ImageFetcher.cpp`: 迁移 ArduinoJson v6 代码 (Static/DynamicJsonDocument) 到 v7 (`JsonDocument`)
+
 ### 2026-02-06
 
 - [x] **OTA 固件管理后端**: 完成固件模型、上传/下载 API 开发，支持版本号校验和 HMAC 签名验证

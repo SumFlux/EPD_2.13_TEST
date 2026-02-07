@@ -26,7 +26,8 @@
       "Bash(\"venv/Scripts/alembic\" upgrade:*)",
       "Bash(\"venv/Scripts/pip\" install:*)",
       "Bash(tree:*)",
-      "Bash(ruff check:*)"
+      "Bash(ruff check:*)",
+      "Bash(iconv:*)"
     ]
   },
   "enabledPlugins": {

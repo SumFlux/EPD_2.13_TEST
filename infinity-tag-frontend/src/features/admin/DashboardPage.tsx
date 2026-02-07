@@ -7,7 +7,7 @@ import { AdminHeader } from './AdminHeader'
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { isAdminAuthenticated, stats, setStats, adminLogout } = useAdminStore()
+  const { isAdminAuthenticated, stats, setStats } = useAdminStore()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,10 +30,7 @@ export function DashboardPage() {
     fetchStats()
   }, [isAdminAuthenticated, navigate, setStats])
 
-  const handleLogout = () => {
-    adminLogout()
-    navigate('/admin/login')
-  }
+  // handleLogout moved to AdminHeader component
 
   if (loading) {
     return (

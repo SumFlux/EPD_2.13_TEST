@@ -95,47 +95,39 @@ class RendererService:
     def convert_to_epd_bitmap(png_bytes: bytes) -> bytes:
         """
         将 PNG 转换为 ESP32 驱动所需的原始位图数据
-        格式: Horizontal scanning, 1 bit/pixel, 0=Black, 1=White
-        Packed into bytes.
-        """
-        # from PIL import Image # Moved to top-level import
-        img = Image.open(io.BytesIO(png_bytes))
 
-        # 确保是二值图
+        格式：212x104 像素，1-bit，按行对齐（Row-Aligned）
+        - 每行 212 像素 = 27 字节（(212+7)/8，向上取整）
+        - 总共 27 * 104 = 2808 字节
+        - MSB first（位7是最左侧像素）
+        - 0=黑色，1=白色
+        
+        重要：GxEPD2 的 drawBitmap 使用 Adafruit GFX 库，
+        该库期望每行按字节对齐，不是紧密打包！
+        """
+        img = Image.open(io.BytesIO(png_bytes))
         img = img.convert('1')
 
         width, height = img.size
-        # 必须确保 width 是 8 的倍数，否则需要 padding
-        # 我们的 width=250. 250%8 = 2. 不是 8 的倍数。
-        # 也就是每行有 31个完整字节 + 2个像素。
-        # 通常做法是每行填充到字节边界 (pad to byte boundary)
+
+        # 验证尺寸
+        if width != 212 or height != 104:
+            raise ValueError(f"图片尺寸必须为 212x104，当前为 {width}x{height}")
 
         pixels = img.load()
-        buffer = bytearray()
+        
+        # 行对齐格式：每行占用 (width + 7) // 8 字节
+        bytes_per_row = (width + 7) // 8  # 27 bytes for 212 pixels
+        buffer = bytearray(bytes_per_row * height)  # 2808 bytes total
 
         for y in range(height):
-            byte_val = 0
             for x in range(width):
                 pixel = pixels[x, y]
-                # PIL '1' mode: 0=Black, 255=White (usually)
-                # But check palette. usually > 127 is white.
-                bit = 1 if pixel > 127 else 0
-
-                # EPD 驱动通常: 0=Black, 1=White
-                # Packing: MSB first (most common)
-                # x%8 == 0 -> bit 7 (0x80)
-                # x%8 == 1 -> bit 6 (0x40)
-
-                bit_pos = 7 - (x % 8)
-                if bit:
-                    byte_val |= (1 << bit_pos)
-
-                if (x % 8) == 7:
-                    buffer.append(byte_val)
-                    byte_val = 0
-
-            # End of row. If width is not multiple of 8, append the last partial byte
-            if (width % 8) != 0:
-                buffer.append(byte_val)
+                # PIL '1' mode: 0=black, 255=white
+                # EPD: 0=black, 1=white
+                if pixel > 127:  # White pixel
+                    byte_index = y * bytes_per_row + (x // 8)
+                    bit_pos = 7 - (x % 8)
+                    buffer[byte_index] |= (1 << bit_pos)
 
         return bytes(buffer)

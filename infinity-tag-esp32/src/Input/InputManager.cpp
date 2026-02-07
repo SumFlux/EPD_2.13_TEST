@@ -14,8 +14,8 @@ static volatile bool _isr_vib_triggered = false;
 static unsigned long _isr_vib_last_time = 0;
 
 // Configuration (times in microseconds for ISR)
-#define BTN_ISR_DEBOUNCE_US 300000  // 300ms in microseconds
-#define VIB_ISR_DEBOUNCE_US 50000   // 50ms in microseconds
+#define BTN_ISR_DEBOUNCE_US 300000 // 300ms in microseconds
+#define VIB_ISR_DEBOUNCE_US 50000  // 50ms in microseconds
 #define VIB_WINDOW_MS 1000
 #define VIB_THRESHOLD_COUNT 3
 

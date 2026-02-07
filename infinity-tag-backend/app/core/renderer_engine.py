@@ -6,12 +6,12 @@ from app.config import settings
 class RendererEngine:
     """
     墨水屏渲染引擎
-    适配 2.13寸 EPD (250x122)
+    适配 2.13寸 EPD (212x104)
     """
 
     # 屏幕参数
-    WIDTH = 250
-    HEIGHT = 122
+    WIDTH = 212
+    HEIGHT = 104
 
     # 字体配置
     DEFAULT_FONT_NAME = "ChangBanDianSong-12.ttf"

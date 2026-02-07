@@ -28,16 +28,16 @@ void EPD_Driver::drawInfo(const char *ver, int enc, int vib, bool useFlicker) {
 
   // Line 2: Encoder value area (only refresh the number)
   int16_t enc_label_x = 0;
-  int16_t enc_value_x = 54;  // After "Encoder: " (9 chars * 6px)
+  int16_t enc_value_x = 54; // After "Encoder: " (9 chars * 6px)
   int16_t enc_y = 102;
-  int16_t enc_value_w = 24;  // 3 digits max (999) * 6px + padding
+  int16_t enc_value_w = 24; // 3 digits max (999) * 6px + padding
   int16_t enc_h = 10;
 
   // Line 3: Vibration value area (only refresh the number)
   int16_t vib_label_x = 0;
-  int16_t vib_value_x = 66;  // After "Vibration: " (11 chars * 6px)
+  int16_t vib_value_x = 66; // After "Vibration: " (11 chars * 6px)
   int16_t vib_y = 114;
-  int16_t vib_value_w = 18;  // 2 digits max (99) * 6px + padding
+  int16_t vib_value_w = 18; // 2 digits max (99) * 6px + padding
   int16_t vib_h = 10;
 
   // Refresh encoder number area
@@ -174,4 +174,45 @@ void EPD_Driver::drawContent(int num, const char *label) {
   display.print(num);
 
   display.fillRect(OFFSET_X, OFFSET_Y + 100, VISIBLE_W, 3, GxEPD_BLACK);
+}
+
+// ==========================================
+// Bitmap Display
+// ==========================================
+
+void EPD_Driver::drawBitmap(const uint8_t *bitmap, size_t size,
+                            bool useFlicker) {
+  // 验证位图大小
+  // 行对齐格式: (212 + 7) / 8 * 104 = 27 * 104 = 2808 字节
+  if (size != 2808) {
+    Serial.print("Error: Invalid bitmap size: ");
+    Serial.print(size);
+    Serial.println(" (expected 2808 bytes for row-aligned format)");
+    return;
+  }
+
+  // 设置全屏窗口
+  display.setFullWindow();
+
+  // 如果使用闪烁刷新，先清屏
+  if (useFlicker) {
+    display.firstPage();
+    do {
+      display.fillScreen(GxEPD_WHITE);
+    } while (display.nextPage());
+  }
+
+  // 绘制位图
+  // 注意：
+  // 1. 位图中 1=白色, 0=黑色，所以用 GxEPD_WHITE 作为前景色
+  // 2. 需要加上 OFFSET_Y=18 的硬件偏移
+  // 3. 背景填充黑色，然后用白色画位图中的 "1" 像素
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_BLACK); // 背景黑色
+    display.drawBitmap(OFFSET_X, OFFSET_Y, bitmap, 212, 104,
+                       GxEPD_WHITE); // 前景白色 + 偏移
+  } while (display.nextPage());
+
+  Serial.println("Bitmap displayed");
 }

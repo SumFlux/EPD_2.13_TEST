@@ -111,6 +111,17 @@ export interface AlmanacHistoryRequest {
 // ---------- 图片管理 ----------
 export type RotateAngle = 0 | 90 | 180 | 270
 
+// 抖动算法类型
+export type DitherAlgorithm = 'floyd_steinberg' | 'atkinson' | 'bayer' | 'threshold'
+
+// 抖动算法描述
+export const DITHER_ALGORITHMS: { value: DitherAlgorithm; label: string; description: string }[] = [
+  { value: 'atkinson', label: 'Atkinson', description: '墨水屏推荐，高光纯白' },
+  { value: 'bayer', label: 'Bayer', description: '有序网点，复古风格' },
+  { value: 'floyd_steinberg', label: 'Floyd-Steinberg', description: '经典抖动，适合照片' },
+  { value: 'threshold', label: '阈值', description: '简单二值化' },
+]
+
 export interface ImageOptions {
   rotate?: RotateAngle
   crop_x?: number
@@ -118,8 +129,20 @@ export interface ImageOptions {
   crop_w?: number
   crop_h?: number
   invert?: boolean
-  dither?: boolean // true=抖动, false=阈值
+
+  // 抖动算法 (新增)
+  dither_algorithm?: DitherAlgorithm
+
+  // 阈值 (用于 threshold 算法)
   threshold?: number // 0-255
+
+  // 预处理参数 (新增)
+  contrast?: number   // 0.5-3.0, 默认1.3
+  sharpness?: number  // 0-5.0, 默认1.5
+  gamma?: number      // 0.3-3.0, 默认1.2
+
+  // 兼容旧接口 (deprecated)
+  dither?: boolean
 }
 
 export interface ImagePreviewRequest extends ImageOptions {
@@ -152,6 +175,7 @@ export interface DivinationWordsRequest {
 
 // 后端返回的是字符串数组，不是对象数组
 export type DivinationCategories = string[]
+export type DivinationCategory = string
 
 export interface DivinationInterpretRequest {
   mode: DivinationMode

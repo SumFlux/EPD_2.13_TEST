@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAdminStore } from '@/stores/adminStore'
 import { adminApi } from '@/api/admin'
 import { logger } from '@/utils/logger'
 import { Loader2, UploadCloud, AlertCircle, CheckCircle2 } from 'lucide-react'
@@ -8,8 +6,7 @@ import type { FirmwareResponse } from '@/types/admin'
 import { AdminHeader } from './AdminHeader'
 
 export function FirmwarePage() {
-    const navigate = useNavigate()
-    const { isAdminAuthenticated, adminLogout } = useAdminStore()
+    // Navigate and adminLogout handled by AdminHeader
 
     const [file, setFile] = useState<File | null>(null)
     const [version, setVersion] = useState('')

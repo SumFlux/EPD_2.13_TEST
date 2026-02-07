@@ -74,7 +74,7 @@ apiClient.interceptors.response.use(
 // 工具函数：创建 FormData
 export function createFormData(
   file: File,
-  options?: Record<string, unknown>
+  options?: object
 ): FormData {
   const formData = new FormData()
   formData.append('file', file)  // 后端期望字段名为 'file'
