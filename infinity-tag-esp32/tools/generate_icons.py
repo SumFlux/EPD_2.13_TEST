@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 卡片图标生成工具
 
@@ -24,20 +25,45 @@ def create_icon(text, output_path, size=48):
     # 绘制边框
     draw.rectangle([0, 0, size-1, size-1], outline=0, width=2)
 
-    # 绘制文字（居中）
-    try:
-        # 尝试使用系统字体
-        font = ImageFont.truetype("arial.ttf", size//2)
-    except:
-        # 如果没有找到字体，使用默认字体
+    # 尝试加载中文字体
+    font = None
+
+    # 获取脚本所在目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+
+    font_paths = [
+        # 项目指定的中文字体（使用绝对路径）
+        os.path.join(project_root, "ttf", "ChangBanDianSong-12.ttf"),
+        os.path.join(project_root, "ttf", "RenOuFangSong-16.ttf"),
+        os.path.join(project_root, "ttf", "匯文仿宋.ttf"),
+        # Windows 中文字体（备用）
+        "C:/Windows/Fonts/msyh.ttc",      # 微软雅黑
+        "C:/Windows/Fonts/simhei.ttf",    # 黑体
+        "C:/Windows/Fonts/simsun.ttc",    # 宋体
+        # Linux 中文字体
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ]
+
+    for font_path in font_paths:
+        try:
+            font = ImageFont.truetype(font_path, size//3)
+            print(f"Using font: {font_path}")
+            break
+        except Exception as e:
+            continue
+
+    if font is None:
+        print("Warning: No Chinese font found, using default font")
         font = ImageFont.load_default()
 
     # 计算文字位置（居中）
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
-    x = (size - text_width) // 2
-    y = (size - text_height) // 2
+    x = (size - text_width) // 2 - bbox[0]
+    y = (size - text_height) // 2 - bbox[1]
 
     # 绘制文字
     draw.text((x, y), text, fill=0, font=font)
@@ -81,7 +107,7 @@ def create_default_icons():
     for text, path in icons:
         create_icon(text, path)
 
-    print(f"\n✅ Created {len(icons)} default icons")
+    print(f"\nCreated {len(icons)} default icons")
     print("\n上传到设备：")
     print("pio run -t uploadfs")
 
