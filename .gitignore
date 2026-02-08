@@ -22,3 +22,5 @@ infinity-tag-frontend/.env
 infinity-tag-backend/data/firmwares/
 
 infinity-tag-backend/assets/custom_images/
+
+infinity-tag-esp32/tools/debug/

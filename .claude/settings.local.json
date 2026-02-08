@@ -30,7 +30,12 @@
       "Bash(iconv:*)",
       "Bash(ls:*)",
       "Bash(pio run)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(wc:*)",
+      "Bash(pio run:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "Bash(tar:*)"
     ]
   },
   "enabledPlugins": {

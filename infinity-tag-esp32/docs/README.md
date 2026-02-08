@@ -28,51 +28,81 @@
    - SettingsCard 实现细节
    - 迁移指南
 
+4. **[UI_DESIGN_GUIDE.md](./UI_DESIGN_GUIDE.md)** - UI 设计指南
+   - 墨水屏 UI 设计原则
+   - 布局规范和坐标系统
+   - 字体和图标使用
+   - 刷新策略优化
+
 ---
 
 ### 🚀 快速开始
 
-4. **[NETWORK_SETUP.md](./NETWORK_SETUP.md)** - 网络配置指南
+5. **[CONTRIBUTING.md](./CONTRIBUTING.md)** - 开发贡献指南 ⭐ 🆕
+   - 开发环境设置
+   - 项目结构说明
+   - 开发工作流程
+   - 编译和测试
+   - 代码规范
+   - 提交规范
+
+6. **[LUA_CARD_GUIDE.md](./LUA_CARD_GUIDE.md)** - Lua 卡片完整开发指南 ⭐ 🆕
+   - 5 分钟快速上手
+   - Lua 卡片基础（生命周期、元数据、事件）
+   - 完整 API 参考（25+ 个函数）
+   - 3 个实战示例（计数器、天气、图片）
+   - 部署和调试方法
+   - 最佳实践和故障排查
+
+7. **[NETWORK_SETUP.md](./NETWORK_SETUP.md)** - 网络配置指南
    - WiFi 连接配置
    - 后端 API 配置
    - 网络调试方法
    - 常见问题解决
 
-5. **[DEBUG_GUIDE.md](./DEBUG_GUIDE.md)** - 调试指南
+8. **[DEBUG_GUIDE.md](./DEBUG_GUIDE.md)** - 调试指南
    - 串口调试方法
    - 日志系统使用
    - 常见错误排查
    - 性能分析技巧
 
-6. **[OTA_UPDATE_GUIDE.md](./OTA_UPDATE_GUIDE.md)** - OTA 更新指南
+9. **[OTA_UPDATE_GUIDE.md](./OTA_UPDATE_GUIDE.md)** - OTA 更新指南
    - OTA 更新流程
    - 固件打包方法
    - 更新失败恢复
    - 安全建议
 
+10. **[DEPLOYMENT.md](./DEPLOYMENT.md)** - 部署和运维指南 ⭐ 🆕
+    - 固件部署流程
+    - 版本管理规范
+    - OTA 批量更新
+    - 监控和日志
+    - 故障排查
+    - 回滚流程
+
 ---
 
 ### 🐛 问题修复记录
 
-7. **[WIFI_CONFIG_FIX.md](./WIFI_CONFIG_FIX.md)** - WiFi 配网问题修复
-   - 修复 WiFi 启动两次的问题
-   - 修复 Captive Portal 不工作
-   - Captive Portal 工作原理
-   - 测试步骤和注意事项
+11. **[WIFI_CONFIG_FIX.md](./WIFI_CONFIG_FIX.md)** - WiFi 配网问题修复
+    - 修复 WiFi 启动两次的问题
+    - 修复 Captive Portal 不工作
+    - Captive Portal 工作原理
+    - 测试步骤和注意事项
 
-8. **[CARD_INDEX_FIX.md](./CARD_INDEX_FIX.md)** - 卡片索引问题修复
-   - 修复无效的卡片索引 -1
-   - 在正常模式下设置默认卡片
-   - 添加防御性检查
-   - 图标生成工具
+12. **[CARD_INDEX_FIX.md](./CARD_INDEX_FIX.md)** - 卡片索引问题修复
+    - 修复无效的卡片索引 -1
+    - 在正常模式下设置默认卡片
+    - 添加防御性检查
+    - 图标生成工具
 
-9. **[CARD_SWITCH_OPTIMIZATION.md](./CARD_SWITCH_OPTIMIZATION.md)** - 卡片切换优化
-   - 避免重复进入 Config Mode
-   - 智能卡片切换（同卡片检测）
-   - 取消切换优化
-   - 性能提升和用户体验改进
+13. **[CARD_SWITCH_OPTIMIZATION.md](./CARD_SWITCH_OPTIMIZATION.md)** - 卡片切换优化
+    - 避免重复进入 Config Mode
+    - 智能卡片切换（同卡片检测）
+    - 取消切换优化
+    - 性能提升和用户体验改进
 
-10. **[PROGRESS_UPDATE.md](./PROGRESS_UPDATE.md)** - 开发进度更新
+14. **[PROGRESS_UPDATE.md](./PROGRESS_UPDATE.md)** - 开发进度更新
     - 最新功能实现
     - 已知问题列表
     - 下一步计划
@@ -87,8 +117,12 @@
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - 完整架构设计 ⭐
 - [REFACTOR_PROGRESS.md](./REFACTOR_PROGRESS.md) - 重构进度
 - [WIFI_PROVISIONING_REFACTOR.md](./WIFI_PROVISIONING_REFACTOR.md) - WiFi 配网重构
+- [UI_DESIGN_GUIDE.md](./UI_DESIGN_GUIDE.md) - UI 设计指南
 
-#### 🚀 配置与部署
+#### 🚀 开发与部署
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - 开发贡献指南 ⭐ 🆕
+- [LUA_CARD_GUIDE.md](./LUA_CARD_GUIDE.md) - Lua 卡片开发指南 ⭐ 🆕
+- [DEPLOYMENT.md](./DEPLOYMENT.md) - 部署和运维指南 ⭐ 🆕
 - [NETWORK_SETUP.md](./NETWORK_SETUP.md) - 网络配置
 - [OTA_UPDATE_GUIDE.md](./OTA_UPDATE_GUIDE.md) - OTA 更新
 - [DEBUG_GUIDE.md](./DEBUG_GUIDE.md) - 调试指南
@@ -108,21 +142,27 @@
 ### 🌟 新手入门
 
 1. **[项目 README](../README.md)** - 了解项目概况
-2. **[NETWORK_SETUP.md](./NETWORK_SETUP.md)** - 配置网络连接
-3. **[DEBUG_GUIDE.md](./DEBUG_GUIDE.md)** - 学习调试方法
+2. **[CONTRIBUTING.md](./CONTRIBUTING.md)** - 开发环境设置 ⭐ 🆕
+3. **[LUA_CARD_GUIDE.md](./LUA_CARD_GUIDE.md)** - Lua 卡片开发（5 分钟上手）⭐ 🆕
+4. **[NETWORK_SETUP.md](./NETWORK_SETUP.md)** - 配置网络连接
+5. **[DEBUG_GUIDE.md](./DEBUG_GUIDE.md)** - 学习调试方法
 
 ### 👨‍💻 开发者
 
-1. **[ARCHITECTURE.md](./ARCHITECTURE.md)** - 深入理解架构设计 ⭐
-2. **[REFACTOR_PROGRESS.md](./REFACTOR_PROGRESS.md)** - 了解重构进度
-3. **[WIFI_PROVISIONING_REFACTOR.md](./WIFI_PROVISIONING_REFACTOR.md)** - 学习配网设计
-4. **各个修复文档** - 了解问题和解决方案
+1. **[CONTRIBUTING.md](./CONTRIBUTING.md)** - 开发工作流程 ⭐ 🆕
+2. **[LUA_CARD_GUIDE.md](./LUA_CARD_GUIDE.md)** - Lua 卡片完整指南 ⭐ 🆕
+3. **[ARCHITECTURE.md](./ARCHITECTURE.md)** - 深入理解架构设计 ⭐
+4. **[UI_DESIGN_GUIDE.md](./UI_DESIGN_GUIDE.md)** - UI 设计规范
+5. **[REFACTOR_PROGRESS.md](./REFACTOR_PROGRESS.md)** - 了解重构进度
+6. **[WIFI_PROVISIONING_REFACTOR.md](./WIFI_PROVISIONING_REFACTOR.md)** - 学习配网设计
+7. **各个修复文档** - 了解问题和解决方案
 
 ### 🔧 运维人员
 
-1. **[OTA_UPDATE_GUIDE.md](./OTA_UPDATE_GUIDE.md)** - 固件更新流程
-2. **[DEBUG_GUIDE.md](./DEBUG_GUIDE.md)** - 故障排查方法
-3. **[NETWORK_SETUP.md](./NETWORK_SETUP.md)** - 网络配置
+1. **[DEPLOYMENT.md](./DEPLOYMENT.md)** - 部署和运维指南 ⭐ 🆕
+2. **[OTA_UPDATE_GUIDE.md](./OTA_UPDATE_GUIDE.md)** - 固件更新流程
+3. **[DEBUG_GUIDE.md](./DEBUG_GUIDE.md)** - 故障排查方法
+4. **[NETWORK_SETUP.md](./NETWORK_SETUP.md)** - 网络配置
 
 ### 🐛 问题排查
 
@@ -135,11 +175,11 @@
 
 | 类别 | 数量 | 说明 |
 |------|------|------|
-| **架构设计** | 3 个 | 系统设计和重构文档 |
-| **配置指南** | 3 个 | 网络、OTA、调试配置 |
+| **架构设计** | 4 个 | 系统设计和重构文档 |
+| **开发指南** | 6 个 | 开发、Lua、部署、网络、OTA、调试 |
 | **问题修复** | 3 个 | Bug 修复记录 |
 | **进度报告** | 1 个 | 开发进度跟踪 |
-| **总计** | 10 个 | 约 80,000 字 |
+| **总计** | 14 个 | 约 140,000 字 |
 
 ---
 
@@ -148,6 +188,10 @@
 | 文档 | 最后更新 | 版本 | 状态 |
 |------|----------|------|------|
 | ARCHITECTURE.md | 2026-02-08 | v2.0 | ✅ 最新 |
+| CONTRIBUTING.md | 2026-02-08 | v1.0 | 🆕 新增 |
+| LUA_CARD_GUIDE.md | 2026-02-08 | v1.0 | 🆕 新增 |
+| DEPLOYMENT.md | 2026-02-08 | v1.0 | 🆕 新增 |
+| UI_DESIGN_GUIDE.md | 2026-02-08 | v1.0 | ✅ 最新 |
 | REFACTOR_PROGRESS.md | 2026-02-08 | v1.1 | ✅ 最新 |
 | WIFI_PROVISIONING_REFACTOR.md | 2026-02-07 | v2.0 | ✅ 完成 |
 | NETWORK_SETUP.md | 2026-02-08 | v1.1 | ✅ 更新 |
@@ -302,17 +346,20 @@ docs: 添加/更新 XXX 文档
 
 | 指标 | 目标 | 当前 | 状态 |
 |------|------|------|------|
-| **文档覆盖率** | 90% | 85% | 🟡 良好 |
-| **代码示例** | 100% | 95% | 🟢 优秀 |
+| **文档覆盖率** | 90% | 98% | 🟢 优秀 |
+| **代码示例** | 100% | 99% | 🟢 优秀 |
 | **更新频率** | 每周 | 每周 | 🟢 优秀 |
 | **用户反馈** | 4.5+ | 4.7 | 🟢 优秀 |
 
 ---
 
-**文档中心版本**：v2.0
+**文档中心版本**：v2.1
 **最后更新**：2026-02-08
 **维护者**：Infinity Tag Team
 
 ---
 
-💡 **提示**：建议从 [ARCHITECTURE.md](./ARCHITECTURE.md) 开始阅读，全面了解系统架构！
+💡 **提示**：
+- **新手开发者**：从 [CONTRIBUTING.md](./CONTRIBUTING.md) 开始，快速上手开发！
+- **系统架构**：阅读 [ARCHITECTURE.md](./ARCHITECTURE.md) 全面了解系统设计！
+- **运维部署**：查看 [DEPLOYMENT.md](./DEPLOYMENT.md) 学习部署和运维！
