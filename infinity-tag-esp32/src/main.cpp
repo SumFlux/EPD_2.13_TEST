@@ -19,6 +19,11 @@
 
 // 卡片
 #include "Cards/SettingsCard.h"
+#include "Cards/LuaCard.h"
+
+// Lua引擎
+#include "Lua/LuaEngine.h"
+#include "Lua/LuaBindings.h"
 
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -43,6 +48,7 @@ std::unique_ptr<OTAManager> otaManager;
 
 // 卡片对象
 std::unique_ptr<SettingsCard> settingsCard;
+std::vector<std::unique_ptr<LuaCard>> luaCards;
 
 // ==========================================
 // 状态变量
@@ -56,32 +62,32 @@ int g_batteryLevel = 5; // 0-5段显示
 // ==========================================
 
 void displayProgress(const char *message, int step, int total) {
-  int progress = (step * 180) / total; // barWidth = 180
+  int progress = (step * 176) / total; // barWidth - 4 = 176
 
   epd.refreshPartial([message, step, total, progress](EPD_Class &d) {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 标题（使用中文字体）
-    ChineseFont::drawString(d, 10, 28, "启动中", GxEPD_BLACK);
+    // 标题（Y=8）
+    ChineseFont::drawString(d, 10, 8, "启动中", GxEPD_BLACK);
 
+    // 进度条（Y=30，需要手动加上OFFSET_Y=18）
     int barWidth = 180;
     int barHeight = 20;
     int barX = 16;
-    int barY = 58;
+    int barY = 30 + 18;  // 加上硬件偏移
 
     d.drawRect(barX, barY, barWidth, barHeight, GxEPD_BLACK);
-    d.fillRect(barX + 2, barY + 2, progress - 4, barHeight - 4, GxEPD_BLACK);
+    if (progress > 0) {
+      d.fillRect(barX + 2, barY + 2, progress, barHeight - 4, GxEPD_BLACK);
+    }
 
-    d.setTextSize(1);
-    ChineseFont::drawString(d, 10, 88, "步骤 ", GxEPD_BLACK);
-    d.setCursor(46, 90);
-    d.print(step);
-    d.print("/");
-    d.print(total);
+    // 步骤文本（Y=56）
+    String stepText = "步骤 " + String(step) + "/" + String(total);
+    ChineseFont::drawString(d, 10, 56, stepText, GxEPD_BLACK);
 
-    // 状态文字（使用中文字体）
-    ChineseFont::drawString(d, 10, 100, message, GxEPD_BLACK);
+    // 状态消息（Y=74）
+    ChineseFont::drawString(d, 10, 74, message, GxEPD_BLACK);
   });
 }
 
@@ -93,11 +99,11 @@ void displayError(const char *message) {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 使用中文字体
-    ChineseFont::drawString(d, 10, 58, "错误:", GxEPD_BLACK);
-    d.setTextSize(1);
-    d.setCursor(10, 80);
-    d.print(message);
+    // 标题（Y=8）
+    ChineseFont::drawString(d, 10, 8, "错误", GxEPD_BLACK);
+
+    // 错误消息（Y=28）
+    ChineseFont::drawString(d, 10, 28, message, GxEPD_BLACK);
   });
 }
 
@@ -169,7 +175,46 @@ void initCards() {
       new SettingsCard(epd, config, *wifiProvisioning, *otaManager));
   cardManager->registerCard(settingsCard.get());
 
-  // TODO: 加载Lua卡片
+  // 初始化Lua引擎
+  LuaEngine& lua = LuaEngine::getInstance();
+  if (!lua.begin(true)) {  // 使用PSRAM
+    Serial.println("[ERROR] Failed to initialize Lua engine");
+  } else {
+    // 注册Lua API
+    LuaBindings::registerAll(epd, config);
+
+    // 扫描并加载所有Lua卡片
+    File root = LittleFS.open("/cards");
+    if (!root) {
+      Serial.println("[ERROR] Failed to open /cards directory");
+    } else if (!root.isDirectory()) {
+      Serial.println("[ERROR] /cards is not a directory");
+      root.close();
+    } else {
+      Serial.println("[Cards] Scanning /cards directory");
+      File file = root.openNextFile();
+      while (file) {
+        if (!file.isDirectory()) {
+          String filename = file.name();
+          if (filename.endsWith(".lua")) {
+            String scriptPath = "/cards/" + filename;
+            std::unique_ptr<LuaCard> luaCard(new LuaCard(scriptPath, epd));
+            if (luaCard->isLoaded()) {
+              cardManager->registerCard(luaCard.get());
+              luaCards.push_back(std::move(luaCard));
+              Serial.printf("[Cards] Loaded Lua card: %s\n", filename.c_str());
+            } else {
+              Serial.printf("[Cards] Failed to load: %s (%s)\n",
+                           filename.c_str(), luaCard->getError().c_str());
+            }
+          }
+        }
+        file.close();
+        file = root.openNextFile();
+      }
+      root.close();
+    }
+  }
 
   Serial.printf("[Cards] Registered %d cards\n", cardManager->getCardCount());
 }
@@ -282,21 +327,21 @@ void setup() {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 标题（使用中文字体）
-    ChineseFont::drawString(d, 10, 58, "系统就绪", GxEPD_BLACK);
+    // 标题（Y=8）
+    ChineseFont::drawString(d, 10, 8, "系统就绪", GxEPD_BLACK);
 
-    d.setTextSize(1);
+    // WiFi状态（Y=28）
     if (wifiStatus) {
-      d.setCursor(10, 78);
-      d.print("WiFi: ");
-      d.print(ipAddr);
+      ChineseFont::drawString(d, 10, 28, "WiFi:", GxEPD_BLACK);
+      ChineseFont::drawString(d, 80, 28, ipAddr, GxEPD_BLACK);
     } else {
-      ChineseFont::drawString(d, 10, 78, "WiFi: 离线", GxEPD_BLACK);
+      ChineseFont::drawString(d, 10, 28, "WiFi: 离线", GxEPD_BLACK);
     }
 
-    ChineseFont::drawString(d, 10, 98, "卡片: ", GxEPD_BLACK);
-    d.setCursor(58, 100);
-    d.print(cardCount);
+    // 卡片数量（Y=46）
+    ChineseFont::drawString(d, 10, 46, "卡片:", GxEPD_BLACK);
+    String cardCountStr = String(cardCount);
+    ChineseFont::drawString(d, 80, 46, cardCountStr, GxEPD_BLACK);
   });
 
   delay(2000);
