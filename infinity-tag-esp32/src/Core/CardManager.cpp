@@ -191,14 +191,40 @@ void CardManager::_exitSwitchMode() {
 
   _state = STATE_TRANSITIONING;
 
-  // 全屏闪白
-  _flashWhite();
+  // 步骤1: 闪白快刷显示"加载中"过渡界面
+  Card *targetCard = _cards[_switchPreviewIndex];
+  String loadingText = targetCard->getCategory() + "/" + targetCard->getName();
 
-  // 显示过渡动画（"分类/卡片名"）
-  _renderTransition();
+  _epd.refreshFlicker([loadingText](EPD_Class &d) {
+    d.fillScreen(GxEPD_WHITE);
+    d.setTextColor(GxEPD_BLACK);
 
-  // 切换到选中的卡片
-  setCurrentCard(_switchPreviewIndex);
+    // 显示"加载中"文本（垂直居中）
+    int16_t textWidth = ChineseFont::getStringWidth(loadingText);
+    int16_t x = (212 - textWidth) / 2;
+    int16_t y = 44; // 垂直居中
+
+    ChineseFont::drawString(d, x, y, loadingText, GxEPD_BLACK);
+  });
+
+  // 等待500ms让用户看到过渡界面
+  delay(500);
+
+  // 步骤2: 切换卡片（触发onExit/onEnter）
+  if (_currentCardIndex == _switchPreviewIndex) {
+    Serial.printf("[CardManager] Re-entering same card: %s\n",
+                  _cards[_currentCardIndex]->getName().c_str());
+    // 先退出再进入，确保卡片重新初始化
+    _cards[_currentCardIndex]->onExit();
+    _cards[_currentCardIndex]->onEnter();
+  } else {
+    // 切换到不同的卡片
+    setCurrentCard(_switchPreviewIndex);
+  }
+
+  // 步骤3: 使用DEEP全刷显示卡片内容
+  // 注意：卡片的onEnter()已经调用了刷新，这里不需要额外刷新
+  // 如果卡片没有自动刷新，可以在这里添加DEEP刷新逻辑
 
   // 返回正常模式
   _state = STATE_NORMAL;
@@ -236,27 +262,50 @@ void CardManager::_renderCardSwitchUI() {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 计算显示范围（当前选中卡片的前后各1张）
-    int startIndex = max(0, previewIdx - 1);
-    int endIndex = min(cardsSize - 1, previewIdx + 1);
-
     // 水平布局：每张卡片占70像素宽
     int cardWidth = 70;
     int startX = (212 - cardWidth * 3) / 2; // 居中对齐
 
-    for (int i = startIndex; i <= endIndex; i++) {
-      int x = startX + (i - startIndex) * cardWidth;
+    // 计算要显示的三张卡片（左、中、右）
+    // 使用循环索引，确保边界情况下也能正确显示
+    int leftIdx = (previewIdx - 1 + cardsSize) % cardsSize;   // 左边卡片
+    int centerIdx = previewIdx;                                // 中间卡片（当前选中）
+    int rightIdx = (previewIdx + 1) % cardsSize;              // 右边卡片
+
+    // 绘制左边卡片
+    {
+      int x = startX;
       int y = 20;
-
-      // 绘制Logo（48x48）
-      bool inverted = (i == previewIdx); // 选中的反色
-      _drawCardLogo(d, x + 11, y, _cards[i]->getLogoPath(), inverted);
-
-      // 绘制卡片名称（使用中文字体）
-      String cardName = _cards[i]->getName();
+      bool inverted = false;
+      _drawCardLogo(d, x + 11, y, _cards[leftIdx]->getLogoPath(), inverted);
+      String cardName = _cards[leftIdx]->getName();
       int16_t textWidth = ChineseFont::getStringWidth(cardName);
-      int16_t textX = x + (48 - textWidth) / 2; // 居中对齐
-      ChineseFont::drawString(d, textX, y + 67, cardName, GxEPD_BLACK);
+      int16_t textX = x + (cardWidth - textWidth) / 2;
+      ChineseFont::drawString(d, textX, y + 52, cardName, GxEPD_BLACK);
+    }
+
+    // 绘制中间卡片（选中状态，反色显示）
+    {
+      int x = startX + cardWidth;
+      int y = 20;
+      bool inverted = true;
+      _drawCardLogo(d, x + 11, y, _cards[centerIdx]->getLogoPath(), inverted);
+      String cardName = _cards[centerIdx]->getName();
+      int16_t textWidth = ChineseFont::getStringWidth(cardName);
+      int16_t textX = x + (cardWidth - textWidth) / 2;
+      ChineseFont::drawString(d, textX, y + 52, cardName, GxEPD_BLACK);
+    }
+
+    // 绘制右边卡片
+    {
+      int x = startX + cardWidth * 2;
+      int y = 20;
+      bool inverted = false;
+      _drawCardLogo(d, x + 11, y, _cards[rightIdx]->getLogoPath(), inverted);
+      String cardName = _cards[rightIdx]->getName();
+      int16_t textWidth = ChineseFont::getStringWidth(cardName);
+      int16_t textX = x + (cardWidth - textWidth) / 2;
+      ChineseFont::drawString(d, textX, y + 52, cardName, GxEPD_BLACK);
     }
   });
 }
@@ -276,10 +325,10 @@ void CardManager::_renderTransition() {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 使用中文字体渲染"分类/卡片名"
+    // 使用中文字体渲染"分类/卡片名"（垂直居中Y=44）
     int16_t textWidth = ChineseFont::getStringWidth(text);
     int16_t x = (212 - textWidth) / 2;
-    int16_t y = 64; // 垂直居中（基线位置）
+    int16_t y = 44; // 垂直居中
 
     ChineseFont::drawString(d, x, y, text, GxEPD_BLACK);
   });

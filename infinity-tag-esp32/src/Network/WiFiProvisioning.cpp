@@ -125,29 +125,66 @@ void WiFiProvisioning::_renderConfigUI() {
   Serial.println("[WiFiProvisioning] Rendering config UI");
 
   String qrData = _generateQRCodeData();
+  String apSSID = _apSSID;
+  String apPassword = _apPassword;
 
-  _epd.refreshFull([&](EPD_Class &d) {
+  // 只捕获需要的值，不捕获 this 指针，避免悬空引用
+  _epd.refreshFull([qrData, apSSID, apPassword](EPD_Class &d) {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 标题（使用中文字体，左上角坐标）
-    ChineseFont::drawString(d, 10, 28, "WiFi配置", GxEPD_BLACK);
+    // 标题（Y=8）
+    ChineseFont::drawString(d, 10, 8, "WiFi配置", GxEPD_BLACK);
 
-    // 左侧：二维码（80x80）
-    _renderQRCode(d, 10, 45, qrData);
+    // 左侧：二维码（80x80，X=10, Y=28）
+    // 内联二维码绘制逻辑，避免调用成员函数
+    {
+      // 使用qrcode库生成二维码
+      QRCode qrcode;
+      uint8_t qrcodeData[qrcode_getBufferSize(3)];
+      qrcode_initText(&qrcode, qrcodeData, 3, ECC_LOW, qrData.c_str());
+
+      // 计算缩放比例（80x80像素）
+      int scale = 80 / qrcode.size;
+      if (scale < 1)
+        scale = 1;
+
+      // 绘制二维码（需要加上硬件偏移OFFSET_Y=18）
+      const int OFFSET_Y = 18;
+      for (uint8_t qy = 0; qy < qrcode.size; qy++) {
+        for (uint8_t qx = 0; qx < qrcode.size; qx++) {
+          if (qrcode_getModule(&qrcode, qx, qy)) {
+            d.fillRect(10 + qx * scale, 28 + qy * scale + OFFSET_Y, scale, scale, GxEPD_BLACK);
+          }
+        }
+      }
+    }
 
     // 右侧：WiFi信息
-    d.setTextSize(1);
-    d.setCursor(100, 50);
-    d.print("SSID:");
-    d.setCursor(100, 62);
-    d.print(_apSSID);
+    // 二维码右边缘X=90，加4px间距 = X=94
+    const int rightX = 84;
 
-    ChineseFont::drawString(d, 100, 76, "密码:", GxEPD_BLACK);
-    d.setCursor(100, 90);
-    d.print(_apPassword);
+    // "扫描二维码"（Y=28，与二维码顶部对齐）
+    ChineseFont::drawString(d, rightX, 8, "扫描二维码", GxEPD_BLACK);
 
-    ChineseFont::drawString(d, 100, 106, "扫描二维码", GxEPD_BLACK);
+    // SSID标签（Y=46）
+    ChineseFont::drawString(d, rightX, 26, "SSID:", GxEPD_BLACK);
+
+    // SSID值（Y=64，换行显示）
+    ChineseFont::drawString(d, rightX, 44, apSSID, GxEPD_BLACK);
+
+    // 密码标签（Y=82）
+    ChineseFont::drawString(d, rightX, 62, "密码:", GxEPD_BLACK);
+
+    // 密码值（Y=100，如果空间不够可以省略或缩短）
+    // 注意：Y=100可能接近底部边界（104），如果显示不全可以调整
+    if (apPassword.length() <= 10) {
+      ChineseFont::drawString(d, rightX, 80, apPassword, GxEPD_BLACK);
+    } else {
+      // 密码太长，只显示前8个字符加"..."
+      String shortPassword = apPassword.substring(0, 8) + "...";
+      ChineseFont::drawString(d, rightX, 80, shortPassword, GxEPD_BLACK);
+    }
   });
 
   Serial.println("[WiFiProvisioning] Config UI rendered");
@@ -165,11 +202,12 @@ void WiFiProvisioning::_renderQRCode(EPD_Class &d, int x, int y,
   if (scale < 1)
     scale = 1;
 
-  // 绘制二维码
+  // 绘制二维码（需要加上硬件偏移OFFSET_Y=18）
+  const int OFFSET_Y = 18;
   for (uint8_t qy = 0; qy < qrcode.size; qy++) {
     for (uint8_t qx = 0; qx < qrcode.size; qx++) {
       if (qrcode_getModule(&qrcode, qx, qy)) {
-        d.fillRect(x + qx * scale, y + qy * scale, scale, scale, GxEPD_BLACK);
+        d.fillRect(x + qx * scale, y + qy * scale + OFFSET_Y, scale, scale, GxEPD_BLACK);
       }
     }
   }

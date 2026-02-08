@@ -128,11 +128,15 @@ void EPD_Driver::refreshPartial(DrawCallback drawFunc, int16_t x, int16_t y,
                PARTIAL_REFRESH_THRESHOLD);
 
     // 直接局刷
+    LOG_DEBUG("[EPD] setPartialWindow start");
     display.setPartialWindow(x, y, w, h);
+    LOG_DEBUG("[EPD] firstPage start");
     display.firstPage();
+    LOG_DEBUG("[EPD] Page loop start");
     do {
       drawFunc(display);
     } while (display.nextPage());
+    LOG_DEBUG("[EPD] Page loop done");
   }
 }
 

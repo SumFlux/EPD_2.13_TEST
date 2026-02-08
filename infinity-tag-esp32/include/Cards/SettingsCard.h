@@ -9,6 +9,33 @@
 #include "Version.h"
 #include <vector>
 
+// 菜单文本常量（避免lambda内部静态变量初始化问题）
+namespace {
+  static const char* const SETTINGS_MENU_TEXTS[] = {
+    "网络设置",  // MENU_WIFI_CONFIG
+    "声音",      // MENU_SOUND_TOGGLE
+    "固件信息",  // MENU_FIRMWARE_INFO
+    "检查更新",  // MENU_CHECK_UPDATE
+    "恢复出厂"   // MENU_FACTORY_RESET
+  };
+
+  // UI 布局常量
+  static const int VISIBLE_ITEMS = 4;        // 最多显示的菜单项数量
+  static const int MENU_ITEM_HEIGHT = 18;    // 菜单项行高（px）
+  static const int MENU_START_Y = 28;        // 菜单项起始Y坐标
+  static const int TITLE_Y = 8;              // 标题Y坐标
+  static const int DIVIDER_Y = 25;           // 分割线Y坐标（标题下方1px）
+  static const int SCREEN_WIDTH = 212;       // 屏幕宽度（px）
+  static const int SCREEN_HEIGHT = 104;      // 可见区域高度（px）
+  static const int OFFSET_Y = 18;            // EPD硬件偏移
+  static const int RIGHT_MARGIN = 10;        // 右边距（px）
+  static const int ARROW_UP_Y = 26;          // 上箭头Y坐标
+  static const int ARROW_DOWN_Y = 103;       // 下箭头Y坐标（屏幕底部）
+  static const int ARROW_X = 207;            // 箭头X坐标（中心点）
+  static const int SELECTION_MARKER_X = 5;   // 选中标记X坐标
+  static const int MENU_TEXT_X = 25;         // 菜单文本X坐标
+  static const int LEFT_MARGIN = 10;         // 左边距（px）
+}
 
 /**
  * @brief 设置卡片
@@ -92,6 +119,38 @@ private:
   bool _soundEnabled;
 
   void _renderMenu(bool forceDeep = false);
+
+  /**
+   * @brief 绘制菜单标题和分割线
+   * @param d EPD显示对象
+   */
+  static void _drawMenuTitle(EPD_Class &d);
+
+  /**
+   * @brief 绘制单个菜单项
+   * @param d EPD显示对象
+   * @param index 菜单项索引
+   * @param y Y坐标
+   * @param selectedIndex 当前选中的索引
+   * @param soundEnabled 声音开关状态
+   */
+  static void _drawMenuItem(EPD_Class &d, int index, int y, int selectedIndex, bool soundEnabled);
+
+  /**
+   * @brief 绘制滚动指示器
+   * @param d EPD显示对象
+   * @param startIndex 起始索引
+   * @param endIndex 结束索引
+   * @param menuCount 菜单项总数
+   */
+  static void _drawScrollIndicators(EPD_Class &d, int startIndex, int endIndex, int menuCount);
+
+  /**
+   * @brief 获取菜单项文本
+   * @param index 菜单项索引
+   * @return 菜单项文本
+   */
+  static const char* _getMenuText(int index);
 
   /**
    * @brief 渲染菜单项

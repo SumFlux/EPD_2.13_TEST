@@ -18,7 +18,10 @@ bool OTAManager::checkUpdate() {
   _epd.refreshFull([](EPD_Class &d) {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
-    ChineseFont::drawString(d, 10, 58, "检查中...", GxEPD_BLACK);
+    // 居中显示（Y=44，垂直居中）
+    int16_t textWidth = ChineseFont::getStringWidth("检查中...");
+    int16_t x = (212 - textWidth) / 2;
+    ChineseFont::drawString(d, x, 44, "检查中...", GxEPD_BLACK);
   });
 
   // 获取更新信息
@@ -55,21 +58,25 @@ bool OTAManager::performUpdate() {
   Serial.println("[OTAManager] Starting update...");
 
   // 显示更新开始界面
-  _epd.refreshFull([&](EPD_Class &d) {
+  String latestVersion = _latestVersion;
+  size_t updateSize = _updateSize;
+
+  // 按值捕获，避免引用失效
+  _epd.refreshFull([latestVersion, updateSize](EPD_Class &d) {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    ChineseFont::drawString(d, 10, 38, "更新中...", GxEPD_BLACK);
+    // 标题（Y=8）
+    ChineseFont::drawString(d, 10, 8, "更新中...", GxEPD_BLACK);
 
-    d.setTextSize(1);
-    ChineseFont::drawString(d, 10, 54, "版本: ", GxEPD_BLACK);
-    d.setCursor(50, 56);
-    d.print(_latestVersion);
+    // 版本（Y=28）
+    ChineseFont::drawString(d, 10, 28, "版本:", GxEPD_BLACK);
+    ChineseFont::drawString(d, 58, 28, latestVersion, GxEPD_BLACK);
 
-    ChineseFont::drawString(d, 10, 70, "大小: ", GxEPD_BLACK);
-    d.setCursor(50, 72);
-    d.print(_updateSize / 1024);
-    d.print(" KB");
+    // 大小（Y=46）
+    ChineseFont::drawString(d, 10, 46, "大小:", GxEPD_BLACK);
+    String sizeStr = String(updateSize / 1024) + " KB";
+    ChineseFont::drawString(d, 58, 46, sizeStr, GxEPD_BLACK);
   });
 
   delay(1000);
@@ -330,36 +337,41 @@ void OTAManager::_showProgress(size_t current, size_t total) {
   Serial.printf("[OTAManager] Progress: %d%% (%d/%d)\n", percentage, current,
                 total);
 
-  int progress = (current * 180) / total; // barWidth = 180
+  int progress = (current * 176) / total; // barWidth - 4 = 176
 
   _epd.refreshPartial([percentage, progress](EPD_Class &d) {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    ChineseFont::drawString(d, 10, 28, "下载中...", GxEPD_BLACK);
+    // 标题（Y=8）
+    ChineseFont::drawString(d, 10, 8, "下载中...", GxEPD_BLACK);
 
-    // 进度条
+    // 进度条（Y=30，需要手动加上OFFSET_Y=18）
     int barWidth = 180;
     int barHeight = 20;
     int barX = 16;
-    int barY = 58;
+    int barY = 30 + 18;  // 加上硬件偏移
 
     d.drawRect(barX, barY, barWidth, barHeight, GxEPD_BLACK);
-    d.fillRect(barX + 2, barY + 2, progress - 4, barHeight - 4, GxEPD_BLACK);
+    if (progress > 0) {
+      d.fillRect(barX + 2, barY + 2, progress, barHeight - 4, GxEPD_BLACK);
+    }
 
-    // 百分比
-    d.setTextSize(1);
-    d.setCursor(10, 88);
-    d.print(percentage);
-    d.print("%");
+    // 百分比（Y=56）
+    String percentStr = String(percentage) + "%";
+    ChineseFont::drawString(d, 10, 56, percentStr, GxEPD_BLACK);
   });
 }
 
 void OTAManager::_showResult(bool success, const String &message) {
-  _epd.refreshFull([&](EPD_Class &d) {
+  // 按值捕获message，避免引用失效
+  _epd.refreshFull([message](EPD_Class &d) {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
-    ChineseFont::drawString(d, 10, 58, message, GxEPD_BLACK);
+    // 居中显示（Y=44，垂直居中）
+    int16_t textWidth = ChineseFont::getStringWidth(message);
+    int16_t x = (212 - textWidth) / 2;
+    ChineseFont::drawString(d, x, 44, message, GxEPD_BLACK);
   });
 
   delay(2000);
