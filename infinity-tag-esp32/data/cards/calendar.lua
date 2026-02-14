@@ -16,7 +16,7 @@ function onInit()
 
     -- 显示加载中
     eink.clear()
-    eink.drawChinese(10, 40, "加载中...")
+    eink.drawChinese(20, 100, "加载中...")
     eink.refreshPartial()
 
     -- 从服务器获取黄历数据
@@ -75,18 +75,18 @@ end
 function _renderDeep()
     eink.clear()
 
-    -- 绘制标题
-    eink.drawChinese(60, 10, "今日黄历")
+    -- 绘制标题（居中）
+    eink.drawChinese(20, 20, "今日黄历")
 
     -- 绘制日期
-    eink.drawStr(10, 30, date)
+    eink.drawStr(10, 50, date)
 
-    -- 绘制宜忌
-    eink.drawChinese(10, 50, "宜: " .. yi)
-    eink.drawChinese(10, 70, "忌: " .. ji)
+    -- 绘制宜忌（垂直排列）
+    eink.drawChinese(10, 80, "宜: " .. yi)
+    eink.drawChinese(10, 110, "忌: " .. ji)
 
-    -- 绘制边框
-    eink.drawRect(5, 5, 202, 94)
+    -- 绘制边框（竖屏尺寸）
+    eink.drawRect(5, 5, 94, 202)
 
     eink.refreshDeep()
 end
@@ -95,18 +95,18 @@ end
 function _render()
     eink.clear()
 
-    -- 绘制标题
-    eink.drawChinese(60, 10, "今日黄历")
+    -- 绘制标题（居中）
+    eink.drawChinese(20, 20, "今日黄历")
 
     -- 绘制日期
-    eink.drawStr(10, 30, date)
+    eink.drawStr(10, 50, date)
 
-    -- 绘制宜忌
-    eink.drawChinese(10, 50, "宜: " .. yi)
-    eink.drawChinese(10, 70, "忌: " .. ji)
+    -- 绘制宜忌（垂直排列）
+    eink.drawChinese(10, 80, "宜: " .. yi)
+    eink.drawChinese(10, 110, "忌: " .. ji)
 
-    -- 绘制边框
-    eink.drawRect(5, 5, 202, 94)
+    -- 绘制边框（竖屏尺寸）
+    eink.drawRect(5, 5, 94, 202)
 
     eink.refresh()
 end

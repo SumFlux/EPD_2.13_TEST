@@ -199,10 +199,10 @@ void CardManager::_exitSwitchMode() {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 显示"加载中"文本（垂直居中）
+    // 显示"加载中"文本（居中）
     int16_t textWidth = ChineseFont::getStringWidth(loadingText);
-    int16_t x = (212 - textWidth) / 2;
-    int16_t y = 44; // 垂直居中
+    int16_t x = (104 - textWidth) / 2;
+    int16_t y = 98; // 垂直居中 (212 / 2 - 8)
 
     ChineseFont::drawString(d, x, y, loadingText, GxEPD_BLACK);
   });
@@ -262,49 +262,49 @@ void CardManager::_renderCardSwitchUI() {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 水平布局：每张卡片占70像素宽
-    int cardWidth = 70;
-    int startX = (212 - cardWidth * 3) / 2; // 居中对齐
+    // 垂直布局：每张卡片占70像素高
+    int cardHeight = 70;
+    int startY = (212 - cardHeight * 3) / 2; // 垂直居中
 
-    // 计算要显示的三张卡片（左、中、右）
+    // 计算要显示的三张卡片（上、中、下）
     // 使用循环索引，确保边界情况下也能正确显示
-    int leftIdx = (previewIdx - 1 + cardsSize) % cardsSize;   // 左边卡片
+    int topIdx = (previewIdx - 1 + cardsSize) % cardsSize;    // 上方卡片
     int centerIdx = previewIdx;                                // 中间卡片（当前选中）
-    int rightIdx = (previewIdx + 1) % cardsSize;              // 右边卡片
+    int bottomIdx = (previewIdx + 1) % cardsSize;             // 下方卡片
 
-    // 绘制左边卡片
+    // Logo居中对齐
+    int logoX = (104 - 48) / 2; // 48x48图标居中
+
+    // 绘制上方卡片
     {
-      int x = startX;
-      int y = 20;
+      int y = startY;
       bool inverted = false;
-      _drawCardLogo(d, x + 11, y, _cards[leftIdx]->getLogoPath(), inverted);
-      String cardName = _cards[leftIdx]->getName();
+      _drawCardLogo(d, logoX, y, _cards[topIdx]->getLogoPath(), inverted);
+      String cardName = _cards[topIdx]->getName();
       int16_t textWidth = ChineseFont::getStringWidth(cardName);
-      int16_t textX = x + (cardWidth - textWidth) / 2;
+      int16_t textX = (104 - textWidth) / 2;
       ChineseFont::drawString(d, textX, y + 52, cardName, GxEPD_BLACK);
     }
 
     // 绘制中间卡片（选中状态，反色显示）
     {
-      int x = startX + cardWidth;
-      int y = 20;
+      int y = startY + cardHeight;
       bool inverted = true;
-      _drawCardLogo(d, x + 11, y, _cards[centerIdx]->getLogoPath(), inverted);
+      _drawCardLogo(d, logoX, y, _cards[centerIdx]->getLogoPath(), inverted);
       String cardName = _cards[centerIdx]->getName();
       int16_t textWidth = ChineseFont::getStringWidth(cardName);
-      int16_t textX = x + (cardWidth - textWidth) / 2;
+      int16_t textX = (104 - textWidth) / 2;
       ChineseFont::drawString(d, textX, y + 52, cardName, GxEPD_BLACK);
     }
 
-    // 绘制右边卡片
+    // 绘制下方卡片
     {
-      int x = startX + cardWidth * 2;
-      int y = 20;
+      int y = startY + cardHeight * 2;
       bool inverted = false;
-      _drawCardLogo(d, x + 11, y, _cards[rightIdx]->getLogoPath(), inverted);
-      String cardName = _cards[rightIdx]->getName();
+      _drawCardLogo(d, logoX, y, _cards[bottomIdx]->getLogoPath(), inverted);
+      String cardName = _cards[bottomIdx]->getName();
       int16_t textWidth = ChineseFont::getStringWidth(cardName);
-      int16_t textX = x + (cardWidth - textWidth) / 2;
+      int16_t textX = (104 - textWidth) / 2;
       ChineseFont::drawString(d, textX, y + 52, cardName, GxEPD_BLACK);
     }
   });
@@ -394,26 +394,38 @@ void CardManager::render(bool wifiConnected, int batteryLevel) {
     return;
   }
 
-  // 分配framebuffer（212x104，2808字节）
-  const size_t FRAMEBUFFER_SIZE = 2808; // 27 bytes/row * 104 rows
-  uint8_t *framebuffer = (uint8_t *)malloc(FRAMEBUFFER_SIZE);
-  if (framebuffer == nullptr) {
-    Serial.println("[CardManager] ERROR: Failed to allocate framebuffer");
+  Card* currentCard = _cards[_currentCardIndex];
+
+  // 1. 创建图层管理器
+  LayerManager layerMgr;
+
+  // 2. 让当前卡片渲染到图层
+  currentCard->renderToLayers(layerMgr);
+
+  // 3. 添加状态栏图层
+  _statusBar.setWifiConnected(wifiConnected);
+  _statusBar.setBatteryLevel(batteryLevel);
+  auto statusBarLayer = std::make_shared<StatusBarLayer>(&_statusBar);
+  layerMgr.addLayer(statusBarLayer);
+
+  // 4. 创建主 framebuffer
+  Framebuffer mainFb;
+  if (!mainFb.isValid()) {
+    Serial.println("[CardManager] ERROR: Failed to allocate main framebuffer");
     return;
   }
 
-  // 清空framebuffer
-  memset(framebuffer, 0, FRAMEBUFFER_SIZE);
+  // 5. 合成所有图层
+  layerMgr.composite(mainFb);
 
-  // 渲染当前卡片
-  _cards[_currentCardIndex]->render(framebuffer, FRAMEBUFFER_SIZE);
+  // 6. 获取刷新模式
+  RefreshMode mode = currentCard->getRefreshMode();
 
-  // 叠加状态栏
-  _statusBar.overlay(framebuffer, 212, 104, wifiConnected, batteryLevel);
-
-  // 刷新到墨水屏
-  // TODO: 实现framebuffer到墨水屏的传输
-
-  // 释放framebuffer
-  free(framebuffer);
+  // 7. 刷新到屏幕
+  if (mode == RefreshMode::PARTIAL) {
+    // 自动计算差异区域
+    _epd.refreshPartialAuto(_epd.getCurrentFramebuffer(), mainFb);
+  } else {
+    _epd.refreshFromFramebuffer(mainFb, mode);
+  }
 }

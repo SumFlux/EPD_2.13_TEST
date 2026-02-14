@@ -82,7 +82,7 @@ private:
   static EPD_Driver *epd;
   static ConfigManager *config;
   static GFXcanvas1 *framebuffer;
-  static const size_t FRAMEBUFFER_SIZE = 2808; // 212 * 104 / 8
+  static const size_t FRAMEBUFFER_SIZE = 2756; // 104 * 212 / 8 = 2756
 
   // ========== HTTP白名单 ==========
   static const char *allowedDomains[];

@@ -45,8 +45,7 @@ void SettingsCard::onEvent(const Event &event) {
     if (event.type == EVENT_BUTTON_RELEASE) {
       LOG_DEBUG("[SettingsCard] Button release in provisioning mode, returning to menu");
       _exitWiFiProvisioning();
-      _state = STATE_MENU;
-      _renderMenu(true); // 使用深度刷新
+      // _exitWiFiProvisioning() 已经调用了 _renderMenu(true)，不需要重复调用
     } else if (event.type == EVENT_BUTTON_LONG_PRESS) {
       LOG_DEBUG("[SettingsCard] Long press in provisioning mode, exiting");
       _exitWiFiProvisioning();
@@ -207,23 +206,19 @@ void SettingsCard::_drawMenuItem(EPD_Class &d, int index, int y, int selectedInd
     ChineseFont::drawString(d, SELECTION_MARKER_X, y, ">", GxEPD_BLACK);
   }
 
-  // 菜单项文本
+  // 菜单项文本（第一行）
   const char *menuText = _getMenuText(index);
   ChineseFont::drawString(d, MENU_TEXT_X, y, menuText, GxEPD_BLACK);
 
-  // 菜单项值（右对齐）
+  // 菜单项值（第二行，缩进显示，增加间距）
   if (index == 1) { // MENU_SOUND_TOGGLE
     const char *value = soundEnabled ? "开" : "关";
-    int16_t valueWidth = ChineseFont::getStringWidth(value);
-    int16_t valueX = SCREEN_WIDTH - RIGHT_MARGIN - valueWidth;
-    ChineseFont::drawString(d, valueX, y, value, GxEPD_BLACK);
+    ChineseFont::drawString(d, MENU_TEXT_X + 10, y + 16, value, GxEPD_BLACK);
   } else if (index == 2) { // MENU_FIRMWARE_INFO - 显示版本号
     char versionBuf[32];
     snprintf(versionBuf, sizeof(versionBuf), "v%d.%d.%d.%d",
              VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_BUILD);
-    int16_t valueWidth = ChineseFont::getStringWidth(versionBuf);
-    int16_t valueX = SCREEN_WIDTH - RIGHT_MARGIN - valueWidth;
-    ChineseFont::drawString(d, valueX, y, versionBuf, GxEPD_BLACK);
+    ChineseFont::drawString(d, MENU_TEXT_X + 10, y + 16, versionBuf, GxEPD_BLACK);
   }
 }
 
@@ -434,21 +429,21 @@ void SettingsCard::_showFirmwareInfo() {
     d.fillScreen(GxEPD_WHITE);
     d.setTextColor(GxEPD_BLACK);
 
-    // 标题（Y=8）
-    ChineseFont::drawString(d, 10, 8, "固件信息", GxEPD_BLACK);
+    // 标题居中
+    int16_t titleWidth = ChineseFont::getStringWidth("固件信息");
+    int16_t titleX = (104 - titleWidth) / 2;
+    ChineseFont::drawString(d, titleX, 8, "固件信息", GxEPD_BLACK);
 
-    // 版本（Y=28）
-    ChineseFont::drawString(d, 10, 28, "版本:", GxEPD_BLACK);
-    // 正确计算：2个中文(32px) + 1个全角冒号(16px) = 48px
-    // X = 10 + 48 = 58
-    ChineseFont::drawString(d, 58, 28, versionBuf, GxEPD_BLACK);
+    // 版本信息左对齐
+    ChineseFont::drawString(d, 10, 40, "版本:", GxEPD_BLACK);
+    ChineseFont::drawString(d, 10, 60, versionBuf, GxEPD_BLACK);
 
-    // 构建日期（Y=46）
-    ChineseFont::drawString(d, 10, 46, "构建:", GxEPD_BLACK);
-    ChineseFont::drawString(d, 58, 46, buildDateBuf, GxEPD_BLACK);
+    // 构建日期
+    ChineseFont::drawString(d, 10, 80, "构建:", GxEPD_BLACK);
+    ChineseFont::drawString(d, 10, 100, buildDateBuf, GxEPD_BLACK);
 
-    // 提示（Y=86）
-    ChineseFont::drawString(d, 10, 86, "按键返回", GxEPD_BLACK);
+    // 提示在底部
+    ChineseFont::drawString(d, 10, 190, "按键返回", GxEPD_BLACK);
   });
 
   // 进入信息显示状态，等待用户按键返回

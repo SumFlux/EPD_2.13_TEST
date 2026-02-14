@@ -51,7 +51,7 @@ int LuaBindings::lua_eink_drawPixel(lua_State *L) {
   int color = luaL_optinteger(L, 3, 0); // 默认黑色
 
   // GFXCanvas1 内部处理边界检查，但显式检查更安全
-  if (x < 0 || x >= 212 || y < 0 || y >= 104) {
+  if (x < 0 || x >= 104 || y < 0 || y >= 212) {
     return 0; // 超出范围，忽略
   }
 
@@ -252,12 +252,12 @@ int LuaBindings::lua_eink_refreshDeep(lua_State *L) {
 }
 
 int LuaBindings::lua_eink_getWidth(lua_State *L) {
-  lua_pushinteger(L, 212);
+  lua_pushinteger(L, 104);  // 目标可见宽度
   return 1;
 }
 
 int LuaBindings::lua_eink_getHeight(lua_State *L) {
-  lua_pushinteger(L, 104);
+  lua_pushinteger(L, 212);  // 目标可见高度
   return 1;
 }
 
@@ -427,11 +427,11 @@ void LuaBindings::registerAll(EPD_Driver &epdRef, ConfigManager &configRef) {
   // 分配framebuffer（使用PSRAM）
   // 仅在PSRAM可用且强制使用时使用? GFXCanvas1 内部使用malloc
   // 我们可以通过宏重载 new 操作符? 不容易
-  // 这里直接 new GFXCanvas1(212, 104)
+  // 这里直接 new GFXCanvas1(104, 212)
   // 如果需要PSRAM，需要在 platformio.ini 中配置 -DBOARD_HAS_PSRAM
   // 并且 esp32-hal-psram.c 会自动接管 malloc
 
-  framebuffer = new GFXcanvas1(212, 104);
+  framebuffer = new GFXcanvas1(104, 212);  // 目标可见区域尺寸
   if (framebuffer) {
     Serial.println("[LuaBindings] GFXcanvas1 allocated");
   } else {

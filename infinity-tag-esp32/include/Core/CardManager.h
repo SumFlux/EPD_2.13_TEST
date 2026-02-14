@@ -3,6 +3,7 @@
 
 #include "Card.h"
 #include "Driver/EPD_Driver.h"
+#include "Driver/Layer.h"
 #include "Event.h"
 #include "EventQueue.h"
 #include "StatusBar.h"

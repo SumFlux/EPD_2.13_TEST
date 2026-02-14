@@ -17,7 +17,7 @@ void EPD_Driver::begin() {
 
   // Display initialization
   display.init(115200, true, 2, false);
-  display.setRotation(1);
+  display.setRotation(2);  // Portrait mode - rotate 90 degrees clockwise
   display.setPartialWindow(0, 0, display.width(), display.height());
 }
 
@@ -148,7 +148,8 @@ void EPD_Driver::refreshFlicker(DrawCallback drawFunc) {
   _partialRefreshCount = 0;
   LOG_DEBUG("[EPD] Flicker");
 
-  display.setPartialWindow(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H);
+  // 使用全屏刷新区域以支持测试模式
+  display.setPartialWindow(0, 0, display.width(), display.height());
 
   // 1. 擦白 (Wipe)
   display.firstPage();
@@ -321,11 +322,11 @@ void EPD_Driver::drawContent(int num, const char *label) {
 void EPD_Driver::drawBitmap(const uint8_t *bitmap, size_t size,
                             bool useFlicker) {
   // 验证位图大小
-  // 行对齐格式: (212 + 7) / 8 * 104 = 27 * 104 = 2808 字节
-  if (size != 2808) {
+  // 行对齐格式: (104 + 7) / 8 * 212 = 13 * 212 = 2756 字节
+  if (size != 2756) {
     Serial.print("Error: Invalid bitmap size: ");
     Serial.print(size);
-    Serial.println(" (expected 2808 bytes for row-aligned format)");
+    Serial.println(" (expected 2756 bytes for row-aligned format)");
     return;
   }
 
@@ -343,14 +344,200 @@ void EPD_Driver::drawBitmap(const uint8_t *bitmap, size_t size,
   // 绘制位图
   // 注意：
   // 1. 位图中 1=白色, 0=黑色，所以用 GxEPD_WHITE 作为前景色
-  // 2. 需要加上 OFFSET_Y=18 的硬件偏移
+  // 2. 需要加上 OFFSET_X=14, OFFSET_Y=34 的硬件偏移
   // 3. 背景填充黑色，然后用白色画位图中的 "1" 像素
   display.firstPage();
   do {
     display.fillScreen(GxEPD_BLACK); // 背景黑色
-    display.drawBitmap(OFFSET_X, OFFSET_Y, bitmap, 212, 104,
+    display.drawBitmap(OFFSET_X, OFFSET_Y, bitmap, 104, 212,
                        GxEPD_WHITE); // 前景白色 + 偏移
   } while (display.nextPage());
 
   Serial.println("Bitmap displayed");
+}
+
+// ==========================================
+// Framebuffer 支持实现
+// ==========================================
+
+void EPD_Driver::transferFramebuffer(const Framebuffer& fb) {
+  if (!fb.isValid()) {
+    Serial.println("[EPD] ERROR: Invalid framebuffer");
+    return;
+  }
+
+  const uint8_t* buffer = fb.getBuffer();
+
+  // 使用 drawBitmap 传输数据
+  // 注意：Framebuffer 格式是 1位单色，与 EPD 兼容
+  // 0=黑色，1=白色
+  display.drawBitmap(OFFSET_X, OFFSET_Y, buffer,
+                     Framebuffer::WIDTH, Framebuffer::HEIGHT,
+                     GxEPD_WHITE);
+}
+
+void EPD_Driver::refreshFromFramebuffer(const Framebuffer& fb, RefreshMode mode) {
+  if (!fb.isValid()) {
+    Serial.println("[EPD] ERROR: Invalid framebuffer");
+    return;
+  }
+
+  switch (mode) {
+    case RefreshMode::PARTIAL:
+      _partialRefreshCount++;
+
+      if (_partialRefreshCount >= PARTIAL_REFRESH_THRESHOLD) {
+        LOG_DEBUG("[EPD] Auto flicker (5 partial reached)");
+        _partialRefreshCount = 0;
+        refreshFromFramebuffer(fb, RefreshMode::FLICKER);
+      } else {
+        LOG_PRINTF("[EPD] Partial from FB (%d/%d)\n", _partialRefreshCount,
+                   PARTIAL_REFRESH_THRESHOLD);
+
+        display.setPartialWindow(OFFSET_X, OFFSET_Y, VISIBLE_W, VISIBLE_H);
+        display.firstPage();
+        do {
+          display.fillScreen(GxEPD_WHITE);
+          transferFramebuffer(fb);
+        } while (display.nextPage());
+      }
+      break;
+
+    case RefreshMode::FLICKER:
+      _partialRefreshCount = 0;
+      LOG_DEBUG("[EPD] Flicker from FB");
+
+      display.setPartialWindow(0, 0, display.width(), display.height());
+
+      // 1. 擦白
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+      } while (display.nextPage());
+
+      // 2. 写入内容
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+        transferFramebuffer(fb);
+      } while (display.nextPage());
+      break;
+
+    case RefreshMode::FULL:
+      _partialRefreshCount = 0;
+      LOG_DEBUG("[EPD] Full from FB");
+
+      display.setPartialWindow(0, 0, display.width(), display.height());
+
+      // 1. 闪黑
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_BLACK);
+      } while (display.nextPage());
+
+      // 2. 闪白
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+      } while (display.nextPage());
+
+      // 3. 绘制内容
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+        transferFramebuffer(fb);
+      } while (display.nextPage());
+      break;
+
+    case RefreshMode::DEEP:
+      _partialRefreshCount = 0;
+      LOG_DEBUG("[EPD] Deep from FB");
+
+      display.setPartialWindow(0, 0, display.width(), display.height());
+
+      // 1. 白
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+      } while (display.nextPage());
+
+      // 2. 黑
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_BLACK);
+      } while (display.nextPage());
+
+      // 3. 白
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+      } while (display.nextPage());
+
+      // 4. 绘制内容
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+        transferFramebuffer(fb);
+      } while (display.nextPage());
+
+      // 5. 加固一次
+      display.firstPage();
+      do {
+        display.fillScreen(GxEPD_WHITE);
+        transferFramebuffer(fb);
+      } while (display.nextPage());
+
+      display.powerOff();
+      break;
+  }
+
+  // 更新当前 framebuffer（用于下次差异对比）
+  memcpy(_currentFb.getBuffer(), fb.getBuffer(), Framebuffer::BUFFER_SIZE);
+}
+
+void EPD_Driver::refreshPartialAuto(const Framebuffer& oldFb, const Framebuffer& newFb) {
+  if (!oldFb.isValid() || !newFb.isValid()) {
+    Serial.println("[EPD] ERROR: Invalid framebuffer");
+    return;
+  }
+
+  // 检测差异区域
+  int16_t minX, minY, maxX, maxY;
+  bool hasDifference = newFb.isDifferent(oldFb, minX, minY, maxX, maxY);
+
+  if (!hasDifference) {
+    LOG_DEBUG("[EPD] No difference, skip refresh");
+    return;
+  }
+
+  LOG_PRINTF("[EPD] Difference detected: (%d,%d) to (%d,%d)\n",
+             minX, minY, maxX, maxY);
+
+  // 计算刷新区域（加上硬件偏移）
+  int16_t refreshX = OFFSET_X + minX;
+  int16_t refreshY = OFFSET_Y + minY;
+  int16_t refreshW = maxX - minX + 1;
+  int16_t refreshH = maxY - minY + 1;
+
+  _partialRefreshCount++;
+
+  if (_partialRefreshCount >= PARTIAL_REFRESH_THRESHOLD) {
+    LOG_DEBUG("[EPD] Auto flicker (5 partial reached)");
+    _partialRefreshCount = 0;
+    refreshFromFramebuffer(newFb, RefreshMode::FLICKER);
+  } else {
+    LOG_PRINTF("[EPD] Partial auto (%d/%d) region: x=%d y=%d w=%d h=%d\n",
+               _partialRefreshCount, PARTIAL_REFRESH_THRESHOLD,
+               refreshX, refreshY, refreshW, refreshH);
+
+    display.setPartialWindow(refreshX, refreshY, refreshW, refreshH);
+    display.firstPage();
+    do {
+      display.fillScreen(GxEPD_WHITE);
+      transferFramebuffer(newFb);
+    } while (display.nextPage());
+
+    // 更新当前 framebuffer
+    memcpy(_currentFb.getBuffer(), newFb.getBuffer(), Framebuffer::BUFFER_SIZE);
+  }
 }

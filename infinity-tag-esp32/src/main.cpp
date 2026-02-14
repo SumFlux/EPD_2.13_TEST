@@ -20,6 +20,7 @@
 // 卡片
 #include "Cards/SettingsCard.h"
 #include "Cards/LuaCard.h"
+#include "Cards/DemoCard.h"
 
 // Lua引擎
 #include "Lua/LuaEngine.h"
@@ -29,6 +30,86 @@
 #include <LittleFS.h>
 #include <esp_task_wdt.h>
 #include <memory>
+
+// ==========================================
+// 测试模式配置
+// ==========================================
+#define TEST_MODE_ENABLED false  // 设置为 false 恢复正常模式
+
+// 前向声明全局对象（测试模式需要）
+extern EPD_Driver epd;
+extern EventQueue eventQueue;
+
+// 测试模式状态
+int g_test_x = 13;         // 初始X坐标（可见区域左边界）
+int g_test_y = 33;         // 初始Y坐标（可见区域上边界）
+bool g_test_mode_x = true; // true=X轴移动, false=Y轴移动
+
+// 可见区域偏移量（根据测试结果）
+static const int VISIBLE_OFFSET_X = 13;
+static const int VISIBLE_OFFSET_Y = 33;
+static const int VISIBLE_WIDTH = 104;
+static const int VISIBLE_HEIGHT = 212;
+
+// 测试模式绘制函数
+void drawTestScreen(EPD_Class &d) {
+  d.fillScreen(GxEPD_WHITE);
+  d.setTextColor(GxEPD_BLACK);
+  d.setTextSize(1);  // 使用标准字体大小
+
+  // 绘制像素点（5x5方块，更容易看见）
+  d.fillRect(g_test_x, g_test_y, 5, 5, GxEPD_BLACK);
+
+  // 绘制坐标文字（在可见区域内）
+  char coordText[32];
+  snprintf(coordText, sizeof(coordText), "X:%d Y:%d", g_test_x, g_test_y);
+  d.setCursor(VISIBLE_OFFSET_X + 5, VISIBLE_OFFSET_Y + 10);
+  d.print(coordText);
+
+  // 显示当前模式（第二行）
+  d.setCursor(VISIBLE_OFFSET_X + 5, VISIBLE_OFFSET_Y + 25);
+  d.print(g_test_mode_x ? "Mode: X" : "Mode: Y");
+
+  // 绘制可见区域边界参考线
+  d.drawRect(VISIBLE_OFFSET_X, VISIBLE_OFFSET_Y, VISIBLE_WIDTH, VISIBLE_HEIGHT, GxEPD_BLACK);
+
+  // 绘制中心十字线（在可见区域内）
+  int centerX = VISIBLE_OFFSET_X + VISIBLE_WIDTH / 2;
+  int centerY = VISIBLE_OFFSET_Y + VISIBLE_HEIGHT / 2;
+  d.drawLine(centerX, VISIBLE_OFFSET_Y, centerX, VISIBLE_OFFSET_Y + VISIBLE_HEIGHT, GxEPD_BLACK);
+  d.drawLine(VISIBLE_OFFSET_X, centerY, VISIBLE_OFFSET_X + VISIBLE_WIDTH, centerY, GxEPD_BLACK);
+}
+
+// 测试模式事件处理
+void handleTestEvent(const Event &event) {
+  if (event.type == EVENT_ENCODER_ROTATE) {
+    // 旋转编码器移动像素点
+    if (g_test_mode_x) {
+      g_test_x += event.value;
+      g_test_x = constrain(g_test_x, 0, 250);  // 扩大到GRAM宽度
+    } else {
+      g_test_y += event.value;
+      g_test_y = constrain(g_test_y, 0, 250);  // 扩大到GRAM高度
+    }
+
+    Serial.printf("[Test] Moved to X:%d Y:%d (Mode: %s)\n",
+                  g_test_x, g_test_y,
+                  g_test_mode_x ? "X" : "Y");
+
+    // 刷新显示
+    epd.refreshFlicker(drawTestScreen);
+  }
+  else if (event.type == EVENT_BUTTON_PRESS) {
+    // 按钮切换移动轴
+    g_test_mode_x = !g_test_mode_x;
+
+    Serial.printf("[Test] Switched to %s mode\n",
+                  g_test_mode_x ? "X-axis" : "Y-axis");
+
+    // 刷新显示
+    epd.refreshFlicker(drawTestScreen);
+  }
+}
 
 // ==========================================
 // 全局对象
@@ -48,6 +129,7 @@ std::unique_ptr<OTAManager> otaManager;
 
 // 卡片对象
 std::unique_ptr<SettingsCard> settingsCard;
+std::unique_ptr<DemoCard> demoCard;
 std::vector<std::unique_ptr<LuaCard>> luaCards;
 
 // ==========================================
@@ -170,7 +252,12 @@ void initCards() {
   // 创建OTA管理器
   otaManager = std::unique_ptr<OTAManager>(new OTAManager(epd, config));
 
-  // 创建设置卡片
+  // 创建演示卡片（第一张卡片，索引0）
+  demoCard = std::unique_ptr<DemoCard>(new DemoCard());
+  cardManager->registerCard(demoCard.get());
+  Serial.println("[Cards] Registered DemoCard");
+
+  // 创建设置卡片（第二张卡片，索引1）
   settingsCard = std::unique_ptr<SettingsCard>(
       new SettingsCard(epd, config, *wifiProvisioning, *otaManager));
   cardManager->registerCard(settingsCard.get());
@@ -239,6 +326,42 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
+  // ==========================================
+  // 测试模式分支
+  // ==========================================
+  if (TEST_MODE_ENABLED) {
+    Serial.println("========================================");
+    Serial.println("  COORDINATE TEST MODE");
+    Serial.println("========================================");
+    Serial.println("[Test] Rotate encoder: Move pixel");
+    Serial.println("[Test] Press button: Switch X/Y axis");
+    Serial.println("========================================");
+
+    // 只初始化必要的硬件
+    epd.begin();
+    input.begin();
+
+    // 绘制初始测试屏幕（使用 DEEP 刷新）
+    Serial.println("[Test] Drawing initial screen...");
+    epd.refreshDeep(drawTestScreen);
+
+    g_systemReady = true;
+
+    Serial.println("[Test] System ready - Start testing!");
+    Serial.printf("[Test] Display size: %d x %d\n", epd.getDisplay().width(), epd.getDisplay().height());
+    Serial.printf("[Test] Initial position: X:%d Y:%d\n", g_test_x, g_test_y);
+    Serial.println("[Test] Test results:");
+    Serial.println("[Test] Left boundary: X=13");
+    Serial.println("[Test] Right boundary: X=122");
+    Serial.println("[Test] Top boundary: Y=33");
+    Serial.println("[Test] Bottom boundary: Y=250");
+    Serial.printf("[Test] Visible area: %d x %d\n", 122-13, 250-33);
+    return;  // 跳过正常启动流程
+  }
+
+  // ==========================================
+  // 正常启动流程
+  // ==========================================
   Serial.println("========================================");
   Serial.println("  INFINITY TAG V2 - Lua Card Engine");
   Serial.println("========================================");
@@ -289,7 +412,7 @@ void setup() {
   initCards();
   Serial.println("[OK] Cards loaded");
 
-  // Step 6: 检查WiFi配置
+  // Step 6: 检查WiFi配 置
   displayProgress("检查网络", 6, 6);
 
   if (config.isFirstBoot() || !config.hasWiFiConfig()) {
@@ -378,8 +501,31 @@ void loop() {
     return;
   }
 
+  // ==========================================
+  // 测试模式事件循环
+  // ==========================================
+  if (TEST_MODE_ENABLED) {
+    // 更新输入状态并产生事件
+    input.update(eventQueue);
+
+    // 处理事件队列
+    Event event;
+    while (eventQueue.pop(event)) {
+      handleTestEvent(event);
+    }
+
+    // 喂狗
+    esp_task_wdt_reset();
+    delay(10);
+    return;
+  }
+
+  // ==========================================
+  // 正常模式事件循环
+  // ==========================================
+
   // 1. 如果设置卡片正在配网，处理DNS和Web请求
-  if (settingsCard && cardManager->getCurrentCardIndex() == 0) {
+  if (settingsCard && cardManager->getCurrentCardIndex() == 1) {  // 设置卡片现在是索引1
     settingsCard->update();
   }
 

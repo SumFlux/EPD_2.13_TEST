@@ -84,19 +84,19 @@ function _renderDeep()
     eink.clear()
     sys.log("eink.clear() done")
 
-    -- 绘制标题
-    eink.drawStr(10, 10, "Lua Card Template")
+    -- 绘制标题（居中）
+    eink.drawStr(10, 20, "Lua Template")
     sys.log("Title drawn")
 
     -- 绘制计数器
-    eink.drawStr(10, 30, "Counter: " .. counter)
+    eink.drawStr(10, 50, "Counter: " .. counter)
     sys.log("Counter drawn")
 
-    -- 绘制说明
-    eink.drawStr(10, 50, "Press button to +1")
-    eink.drawStr(10, 65, "Long press to reset")
-    eink.drawStr(10, 80, "Rotate encoder +/-1")
-    eink.drawStr(10, 95, "Shake to +10")
+    -- 绘制说明（垂直排列）
+    eink.drawStr(10, 80, "Press: +1")
+    eink.drawStr(10, 100, "Long: reset")
+    eink.drawStr(10, 120, "Rotate: +/-1")
+    eink.drawStr(10, 140, "Shake: +10")
     sys.log("Instructions drawn")
 
     -- 使用深度刷新（最彻底）
@@ -109,17 +109,17 @@ end
 function _render()
     eink.clear()
 
-    -- 绘制标题
-    eink.drawStr(10, 10, "Lua Card Template")
+    -- 绘制标题（居中）
+    eink.drawStr(10, 20, "Lua Template")
 
     -- 绘制计数器
-    eink.drawStr(10, 30, "Counter: " .. counter)
+    eink.drawStr(10, 50, "Counter: " .. counter)
 
-    -- 绘制说明
-    eink.drawStr(10, 50, "Press button to +1")
-    eink.drawStr(10, 65, "Long press to reset")
-    eink.drawStr(10, 80, "Rotate encoder +/-1")
-    eink.drawStr(10, 95, "Shake to +10")
+    -- 绘制说明（垂直排列）
+    eink.drawStr(10, 80, "Press: +1")
+    eink.drawStr(10, 100, "Long: reset")
+    eink.drawStr(10, 120, "Rotate: +/-1")
+    eink.drawStr(10, 140, "Shake: +10")
 
     -- 使用局部刷新（更快）
     eink.refreshPartial()

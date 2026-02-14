@@ -20,21 +20,22 @@ namespace {
   };
 
   // UI 布局常量
-  static const int VISIBLE_ITEMS = 4;        // 最多显示的菜单项数量
-  static const int MENU_ITEM_HEIGHT = 18;    // 菜单项行高（px）
-  static const int MENU_START_Y = 28;        // 菜单项起始Y坐标
+  static const int VISIBLE_ITEMS = 5;        // 最多显示的菜单项数量（竖屏，每项占两行）
+  static const int MENU_ITEM_HEIGHT = 35;    // 菜单项行高（px，包含第二行和间距）
+  static const int MENU_START_Y = 30;        // 菜单项起始Y坐标
   static const int TITLE_Y = 8;              // 标题Y坐标
   static const int DIVIDER_Y = 25;           // 分割线Y坐标（标题下方1px）
-  static const int SCREEN_WIDTH = 212;       // 屏幕宽度（px）
-  static const int SCREEN_HEIGHT = 104;      // 可见区域高度（px）
-  static const int OFFSET_Y = 18;            // EPD硬件偏移
-  static const int RIGHT_MARGIN = 10;        // 右边距（px）
+  static const int SCREEN_WIDTH = 104;       // 屏幕宽度（px）
+  static const int SCREEN_HEIGHT = 212;      // 可见区域高度（px）
+  static const int OFFSET_X = 0;             // EPD硬件偏移
+  static const int OFFSET_Y = 28;            // EPD硬件偏移（调整后）
+  static const int RIGHT_MARGIN = 5;         // 右边距（px）
   static const int ARROW_UP_Y = 26;          // 上箭头Y坐标
-  static const int ARROW_DOWN_Y = 103;       // 下箭头Y坐标（屏幕底部）
-  static const int ARROW_X = 207;            // 箭头X坐标（中心点）
-  static const int SELECTION_MARKER_X = 5;   // 选中标记X坐标
-  static const int MENU_TEXT_X = 25;         // 菜单文本X坐标
-  static const int LEFT_MARGIN = 10;         // 左边距（px）
+  static const int ARROW_DOWN_Y = 203;       // 下箭头Y坐标（屏幕底部）
+  static const int ARROW_X = 94;             // 箭头X坐标（中心点，调整到可见区域）
+  static const int SELECTION_MARKER_X = 10;  // 选中标记X坐标（增加左边距）
+  static const int MENU_TEXT_X = 25;         // 菜单文本X坐标（增加左边距）
+  static const int LEFT_MARGIN = 10;         // 左边距（px，增加）
 }
 
 /**

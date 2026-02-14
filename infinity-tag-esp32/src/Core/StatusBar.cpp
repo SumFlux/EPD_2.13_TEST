@@ -148,3 +148,49 @@ bool StatusBar::_getPixel(const uint8_t* framebuffer, int width, int x, int y) {
 
     return (framebuffer[byteIndex] >> bitIndex) & 0x01;
 }
+
+void StatusBar::renderToFramebuffer(Framebuffer& fb) {
+    // 清空 framebuffer（透明背景）
+    fb.clear(Framebuffer::WHITE);
+
+    // 绘制 WiFi 图标（如果断联）
+    if (!_wifiConnected) {
+        for (int dy = 0; dy < ICON_HEIGHT; dy++) {
+            for (int dx = 0; dx < ICON_WIDTH; dx++) {
+                int iconByteIndex = (dy * ICON_WIDTH + dx) / 8;
+                int iconBitIndex = (dy * ICON_WIDTH + dx) % 8;
+
+                bool iconPixel = (WIFI_DISCONNECTED_ICON[iconByteIndex] >> iconBitIndex) & 0x01;
+
+                if (iconPixel) {
+                    fb.setPixel(WIFI_ICON_X + dx, WIFI_ICON_Y + dy, Framebuffer::BLACK);
+                }
+            }
+        }
+    }
+
+    // 绘制电池图标
+    const uint8_t* batteryIcon = nullptr;
+    switch (_batteryLevel) {
+        case 0: batteryIcon = BATTERY_ICON_0; break;
+        case 1: batteryIcon = BATTERY_ICON_1; break;
+        case 2: batteryIcon = BATTERY_ICON_2; break;
+        case 3: batteryIcon = BATTERY_ICON_3; break;
+        case 4: batteryIcon = BATTERY_ICON_4; break;
+        case 5: batteryIcon = BATTERY_ICON_5; break;
+        default: batteryIcon = BATTERY_ICON_5; break;
+    }
+
+    for (int dy = 0; dy < ICON_HEIGHT; dy++) {
+        for (int dx = 0; dx < ICON_WIDTH; dx++) {
+            int iconByteIndex = (dy * ICON_WIDTH + dx) / 8;
+            int iconBitIndex = (dy * ICON_WIDTH + dx) % 8;
+
+            bool iconPixel = (batteryIcon[iconByteIndex] >> iconBitIndex) & 0x01;
+
+            if (iconPixel) {
+                fb.setPixel(BATTERY_ICON_X + dx, BATTERY_ICON_Y + dy, Framebuffer::BLACK);
+            }
+        }
+    }
+}

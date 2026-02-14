@@ -12,7 +12,7 @@ local imageLoaded = false
 function onInit()
     sys.log("Image card initialized")
     eink.clear()
-    eink.drawStr(10, 50, "Loading image...")
+    eink.drawStr(10, 100, "Loading...")
     eink.refreshPartial()
 
     -- 下载图片
@@ -23,7 +23,7 @@ function onInit()
         eink.refreshDeep()  -- 使用DEEP刷新显示图片
     else
         eink.clear()
-        eink.drawStr(10, 50, "Failed to load")
+        eink.drawStr(10, 100, "Failed")
         eink.refreshDeep()
         sys.log("Failed to load image")
     end

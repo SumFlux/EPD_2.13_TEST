@@ -2,6 +2,7 @@
 #define STATUS_BAR_H
 
 #include <Arduino.h>
+#include "Driver/Framebuffer.h"
 
 /**
  * @brief 状态栏渲染器
@@ -20,7 +21,8 @@ public:
     bool begin();
 
     /**
-     * @brief 叠加状态栏图标到framebuffer
+     * @brief 叠加状态栏图标到framebuffer（旧接口）
+     * @deprecated 请使用 renderToFramebuffer() 代替
      *
      * @param framebuffer 帧缓冲区指针
      * @param width 屏幕宽度（像素）
@@ -30,6 +32,24 @@ public:
      */
     void overlay(uint8_t* framebuffer, int width, int height,
                  bool wifiConnected, int batteryLevel);
+
+    /**
+     * @brief 渲染状态栏到 Framebuffer（新接口）
+     *
+     * @param fb Framebuffer 对象
+     */
+    void renderToFramebuffer(Framebuffer& fb);
+
+    /**
+     * @brief 设置 WiFi 连接状态
+     */
+    void setWifiConnected(bool connected) { _wifiConnected = connected; }
+
+    /**
+     * @brief 设置电池电量
+     * @param level 电池电量（0-5）
+     */
+    void setBatteryLevel(int level) { _batteryLevel = level; }
 
 private:
     /**
@@ -70,10 +90,14 @@ private:
      */
     bool _getPixel(const uint8_t* framebuffer, int width, int x, int y);
 
+    // 状态变量
+    bool _wifiConnected = true;
+    int _batteryLevel = 5;
+
     // 图标位置（右上角）
-    static const int WIFI_ICON_X = 180;
+    static const int WIFI_ICON_X = 70;
     static const int WIFI_ICON_Y = 2;
-    static const int BATTERY_ICON_X = 195;
+    static const int BATTERY_ICON_X = 85;
     static const int BATTERY_ICON_Y = 2;
 
     // 图标尺寸
