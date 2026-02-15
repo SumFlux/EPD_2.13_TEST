@@ -1,5 +1,5 @@
 """
-管理员相关的请求/响应模型
+管理员相关的请求/响应模型 - 设备即用户架构
 """
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -20,9 +20,11 @@ class AdminLoginResponse(BaseModel):
 
 
 class AdminUserResponse(BaseModel):
-    """管理员查看的用户信息"""
+    """管理员查看的用户信息（设备信息）"""
     id: int
-    device_id: str
+    device_code: str
+    uuid: str
+    status: str
     password_set: bool
     activated_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
@@ -41,9 +43,8 @@ class AdminUserListResponse(BaseModel):
 
 
 class AdminUserDetailResponse(AdminUserResponse):
-    """用户详情响应（含关联设备）"""
-    device_code: Optional[str] = None
-    device_status: Optional[str] = None
+    """用户详情响应"""
+    pass
 
 
 class AdminStatsResponse(BaseModel):
@@ -54,6 +55,41 @@ class AdminStatsResponse(BaseModel):
     disabled_devices: int
     total_users: int
     users_with_password: int
+
+
+class DeviceCreateRequest(BaseModel):
+    """创建设备请求"""
+    device_code: str = Field(..., min_length=6, max_length=6)
+    uuid: str = Field(..., min_length=1)
+    init_password: str = Field(..., min_length=6)
+
+
+class DeviceCreateResponse(BaseModel):
+    """创建设备响应"""
+    id: int
+    device_code: str
+    uuid: str
+    status: str
+    created_at: datetime
+
+
+class DeviceBatchItem(BaseModel):
+    """批量导入设备项"""
+    device_code: str = Field(..., min_length=6, max_length=6)
+    uuid: str = Field(..., min_length=1)
+    init_password: str = Field(..., min_length=6)
+
+
+class DeviceBatchImportRequest(BaseModel):
+    """批量导入设备请求"""
+    devices: List[DeviceBatchItem]
+
+
+class DeviceBatchImportResponse(BaseModel):
+    """批量导入设备响应"""
+    success_count: int
+    failed_count: int
+    errors: Optional[List[str]] = None
 
 
 class AdminLogResponse(BaseModel):

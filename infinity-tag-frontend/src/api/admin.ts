@@ -31,20 +31,19 @@ export const adminApi = {
   },
 
   /**
-   * 获取设备列表
+   * 获取设备列表（查询 User 表）
    */
   getDevices: async (params?: {
     page?: number
     page_size?: number
     status?: string
-    batch_name?: string
   }): Promise<DeviceListResponse> => {
     const response = await apiClient.get<DeviceListResponse>('/admin/devices', { params })
     return response.data
   },
 
   /**
-   * 录入单个设备
+   * 创建设备（创建 User 记录）
    */
   createDevice: async (data: DeviceCreateRequest): Promise<DeviceCreateResponse> => {
     const response = await apiClient.post<DeviceCreateResponse>('/admin/devices', data)
@@ -52,7 +51,7 @@ export const adminApi = {
   },
 
   /**
-   * 批量导入设备
+   * 批量导入设备（批量创建 User 记录）
    */
   batchImportDevices: async (data: DeviceBatchImportRequest): Promise<DeviceBatchImportResponse> => {
     const response = await apiClient.post<DeviceBatchImportResponse>('/admin/devices/batch', data)
@@ -60,34 +59,19 @@ export const adminApi = {
   },
 
   /**
-   * 获取设备详情
+   * 获取设备详情（通过 device_code）
    */
-  getDevice: async (deviceId: number): Promise<Device> => {
-    const response = await apiClient.get<Device>(`/admin/devices/${deviceId}`)
+  getDevice: async (deviceCode: string): Promise<Device> => {
+    const response = await apiClient.get<Device>(`/admin/devices/${deviceCode}`)
     return response.data
   },
 
   /**
-   * 禁用设备
+   * 禁用设备（更新 User.status）
    */
-  disableDevice: async (deviceId: number): Promise<Device> => {
-    const response = await apiClient.put<Device>(`/admin/devices/${deviceId}/disable`)
+  disableDevice: async (deviceCode: string): Promise<Device> => {
+    const response = await apiClient.put<Device>(`/admin/devices/${deviceCode}/disable`)
     return response.data
-  },
-
-  /**
-   * 重置设备
-   */
-  resetDevice: async (deviceId: number): Promise<Device> => {
-    const response = await apiClient.put<Device>(`/admin/devices/${deviceId}/reset`)
-    return response.data
-  },
-
-  /**
-   * 删除设备
-   */
-  deleteDevice: async (deviceId: number): Promise<void> => {
-    await apiClient.delete(`/admin/devices/${deviceId}`)
   },
 
   /**

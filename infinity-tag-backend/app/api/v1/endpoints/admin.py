@@ -1,27 +1,22 @@
 """
-管理员 API 端点
+管理员 API 端点 - 设备即用户架构
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from app.services.admin_service import AdminService
-from app.services.device_service import DeviceService
 from app.schemas.admin import (
     AdminLoginRequest,
     AdminLoginResponse,
     AdminUserListResponse,
     AdminUserDetailResponse,
     AdminUserResponse,
-    AdminStatsResponse
-)
-from app.schemas.device import (
+    AdminStatsResponse,
     DeviceCreateRequest,
     DeviceCreateResponse,
     DeviceBatchImportRequest,
-    DeviceBatchImportResponse,
-    DeviceResponse,
-    DeviceListResponse
+    DeviceBatchImportResponse
 )
 
 router = APIRouter()
@@ -47,22 +42,20 @@ async def get_stats(
     return await service.get_stats()
 
 
-@router.get("/devices", response_model=DeviceListResponse)
+@router.get("/devices", response_model=AdminUserListResponse)
 async def get_devices(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
-    batch_name: Optional[str] = Query(None),
     db: AsyncSession = Depends(deps.get_db),
     _: str = Depends(deps.verify_admin_token)
 ):
-    """获取设备列表"""
-    service = DeviceService(db)
+    """获取设备列表（查询 User 表）"""
+    service = AdminService(db)
     return await service.get_device_list(
         page=page,
         page_size=page_size,
-        status=status,
-        batch_name=batch_name
+        status_filter=status
     )
 
 
@@ -72,8 +65,8 @@ async def create_device(
     db: AsyncSession = Depends(deps.get_db),
     _: str = Depends(deps.verify_admin_token)
 ):
-    """录入单个设备（输入UUID，自动计算设备码和初始密码）"""
-    service = DeviceService(db)
+    """创建设备（创建 User 记录）"""
+    service = AdminService(db)
     return await service.create_device(request)
 
 
@@ -83,85 +76,28 @@ async def batch_import_devices(
     db: AsyncSession = Depends(deps.get_db),
     _: str = Depends(deps.verify_admin_token)
 ):
-    """批量导入设备"""
-    service = DeviceService(db)
-    return await service.batch_import(request)
+    """批量导入设备（批量创建 User 记录）"""
+    service = AdminService(db)
+    return await service.batch_import_devices(request)
 
 
-@router.get("/devices/{device_id}", response_model=DeviceResponse)
+@router.get("/devices/{device_code}", response_model=AdminUserDetailResponse)
 async def get_device(
-    device_id: int,
+    device_code: str,
     db: AsyncSession = Depends(deps.get_db),
     _: str = Depends(deps.verify_admin_token)
 ):
-    """获取设备详情"""
-    service = DeviceService(db)
-    return await service.get_device(device_id)
+    """获取设备详情（通过 device_code 查询）"""
+    service = AdminService(db)
+    return await service.get_device_detail(device_code)
 
 
-@router.put("/devices/{device_id}/disable", response_model=DeviceResponse)
+@router.put("/devices/{device_code}/disable", response_model=AdminUserResponse)
 async def disable_device(
-    device_id: int,
+    device_code: str,
     db: AsyncSession = Depends(deps.get_db),
     _: str = Depends(deps.verify_admin_token)
 ):
-    """禁用设备"""
-    service = DeviceService(db)
-    return await service.disable_device(device_id)
-
-
-@router.put("/devices/{device_id}/reset", response_model=DeviceResponse)
-async def reset_device(
-    device_id: int,
-    db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(deps.verify_admin_token)
-):
-    """重置设备（解除激活，恢复初始密码有效）"""
-    service = DeviceService(db)
-    return await service.reset_device(device_id)
-
-
-@router.delete("/devices/{device_id}")
-async def delete_device(
-    device_id: int,
-    db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(deps.verify_admin_token)
-):
-    """删除设备"""
-    service = DeviceService(db)
-    await service.delete_device(device_id)
-    return {"success": True, "message": "设备已删除"}
-
-
-@router.get("/users", response_model=AdminUserListResponse)
-async def get_users(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(deps.verify_admin_token)
-):
-    """获取用户列表"""
+    """禁用设备（更新 User.status）"""
     service = AdminService(db)
-    return await service.get_user_list(page=page, page_size=page_size)
-
-
-@router.get("/users/{user_id}", response_model=AdminUserDetailResponse)
-async def get_user_detail(
-    user_id: int,
-    db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(deps.verify_admin_token)
-):
-    """获取用户详情"""
-    service = AdminService(db)
-    return await service.get_user_detail(user_id)
-
-
-@router.put("/users/{user_id}/disable", response_model=AdminUserResponse)
-async def disable_user(
-    user_id: int,
-    db: AsyncSession = Depends(deps.get_db),
-    _: str = Depends(deps.verify_admin_token)
-):
-    """禁用用户"""
-    service = AdminService(db)
-    return await service.disable_user(user_id)
+    return await service.disable_device(device_code)

@@ -59,10 +59,13 @@ class UserProfileResponse(UserProfileBase):
 
 
 class UserResponse(BaseModel):
-    """用户完整信息响应"""
+    """用户完整信息响应（包含设备信息）"""
     id: int
     device_code: str
-    is_active: bool
+    uuid: str
+    status: str
+    password_set: bool
+    activated_at: Optional[str] = None
     last_login_at: Optional[str] = None
     profile: Optional[UserProfileResponse] = None
 

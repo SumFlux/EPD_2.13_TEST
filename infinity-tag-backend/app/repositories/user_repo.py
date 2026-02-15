@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
@@ -13,10 +13,23 @@ class UserRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_device_id(self, device_id: str) -> Optional[User]:
-        stmt = select(User).where(User.device_id == device_id)
+    async def get_by_device_code(self, device_code: str) -> Optional[User]:
+        """按 device_code 查询用户"""
+        stmt = select(User).where(User.device_code == device_code)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_by_uuid(self, uuid: str) -> Optional[User]:
+        """按 uuid 查询用户"""
+        stmt = select(User).where(User.uuid == uuid)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_status(self, status: str, limit: int = 100, offset: int = 0) -> List[User]:
+        """按 status 过滤用户"""
+        stmt = select(User).where(User.status == status).limit(limit).offset(offset)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
     async def create_user(self, user_data: dict) -> User:
         user = User(**user_data)
